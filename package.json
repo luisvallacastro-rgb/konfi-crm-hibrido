@@ -1,0 +1,13 @@
+{
+  "name": "konfi-crm-hibrido",
+  "version": "0.1.0",
+  "private": true,
+  "description": "CRM web KONFI conectado a app movil Flutter para operacion comercial.",
+  "scripts": {
+    "start": "node backend/server.js",
+    "health": "node -e \"fetch('http://127.0.0.1:' + (process.env.PORT || 4180) + '/api/health').then(r => r.json()).then(console.log)\""
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}

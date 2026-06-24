@@ -1,0 +1,244 @@
+<!doctype html>
+<html lang="es">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>KONFI CRM</title>
+    <link rel="stylesheet" href="/styles.css" />
+  </head>
+  <body>
+    <aside class="sidebar">
+      <div class="brand">
+        <div class="brand-mark">K</div>
+        <div>
+          <strong>KONFI CRM</strong>
+          <span>Ventas y postventa</span>
+        </div>
+      </div>
+      <nav class="nav">
+        <button class="active" title="Vendedores" data-view="sellers">
+          <span>V</span>
+          Vendedores
+        </button>
+        <button title="Agenda" data-view="agenda">
+          <span>A</span>
+          Agenda
+        </button>
+        <button title="Respuestas" data-view="responses">
+          <span>R</span>
+          Respuestas
+        </button>
+        <button title="Seguimiento" data-view="pipeline">
+          <span>S</span>
+          Seguimiento
+        </button>
+      </nav>
+      <section class="sidebar-panel">
+        <span class="eyebrow">Proceso activo</span>
+        <strong>8 etapas KONFI</strong>
+        <p>Prospeccion, cierre, compilado y postventa en un mismo flujo.</p>
+      </section>
+    </aside>
+
+    <main class="app-shell">
+      <header class="topbar">
+        <div class="top-actions">
+          <button id="newOpportunityButton" class="primary-button" title="Abrir oportunidad">+ Oportunidad</button>
+          <label class="search">
+            <span>⌕</span>
+            <input id="searchInput" type="search" placeholder="Buscar cliente, etapa o vendedor" />
+          </label>
+          <button id="refreshButton" class="icon-button" title="Actualizar datos">↻</button>
+        </div>
+      </header>
+
+      <section id="dashboardView">
+        <section id="kpiGrid" class="kpi-grid" aria-label="KPIs principales"></section>
+
+        <section class="workspace">
+          <div class="main-column">
+            <section class="panel">
+              <div class="panel-header">
+                <div>
+                  <span class="eyebrow">Agenda preparada desde CRM</span>
+                  <h2>Visitas y acciones proximas</h2>
+                </div>
+                <div class="segmented" role="tablist" aria-label="Filtro de agenda">
+                  <button class="active" data-owner="all">Todos</button>
+                  <button data-owner="u2">Carlos</button>
+                  <button data-owner="u3">Sofia</button>
+                </div>
+              </div>
+              <div id="agendaList" class="agenda-list"></div>
+            </section>
+
+            <section class="panel">
+              <div class="panel-header">
+                <div>
+                  <span class="eyebrow">Seguimiento por etapa</span>
+                  <h2>Proceso de ventas KONFI</h2>
+                </div>
+                <span id="pipelineTotal" class="total-pill"></span>
+              </div>
+              <div id="pipelineBoard" class="pipeline-board"></div>
+            </section>
+          </div>
+
+          <aside class="detail-column">
+            <section class="panel selected-panel">
+              <div class="panel-header compact">
+                <div>
+                  <span class="eyebrow">Ficha comercial</span>
+                  <h2 id="selectedCompany">Selecciona una oportunidad</h2>
+                </div>
+              </div>
+              <div id="selectedDetail" class="selected-detail"></div>
+            </section>
+
+            <section class="panel">
+              <div class="panel-header compact">
+                <div>
+                  <span class="eyebrow">Anexos digitalizados</span>
+                  <h2>Formularios por etapa</h2>
+                </div>
+              </div>
+              <div id="formsList" class="forms-list"></div>
+            </section>
+          </aside>
+        </section>
+      </section>
+
+      <section id="moduleView" class="module-view is-hidden"></section>
+    </main>
+
+    <dialog id="opportunityDialog" class="modal">
+      <form id="opportunityForm" method="dialog">
+        <div class="modal-header">
+          <div>
+            <span class="eyebrow">Apertura comercial</span>
+            <h2 id="dialogTitle">Nueva oportunidad</h2>
+          </div>
+          <button type="button" id="closeDialogButton" class="icon-button" title="Cerrar">x</button>
+        </div>
+
+        <input type="hidden" name="id" />
+
+        <div class="form-grid">
+          <label>
+            Empresa
+            <input name="company" required placeholder="Nombre de la empresa" />
+          </label>
+          <label>
+            Vendedor
+            <select name="ownerId" required></select>
+          </label>
+          <label>
+            Contacto
+            <input name="contact" required placeholder="Nombre del contacto" />
+          </label>
+          <label>
+            Telefono
+            <input name="phone" placeholder="+503 ..." />
+          </label>
+          <label>
+            Segmento
+            <input name="segment" placeholder="Industria, comercio, salud..." />
+          </label>
+          <label>
+            Ubicacion
+            <input name="location" placeholder="San Salvador" />
+          </label>
+          <label>
+            Etapa
+            <select name="stageId" required></select>
+          </label>
+          <label>
+            Prioridad
+            <select name="priority">
+              <option>Alta</option>
+              <option selected>Media</option>
+              <option>Baja</option>
+            </select>
+          </label>
+          <label>
+            Temperatura
+            <select name="temperature">
+              <option>Frio</option>
+              <option selected>Tibio</option>
+              <option>Caliente</option>
+              <option>Cliente</option>
+            </select>
+          </label>
+          <label>
+            Monto estimado
+            <input name="estimatedAmount" type="number" min="0" step="100" placeholder="0" />
+          </label>
+          <label>
+            Proxima fecha
+            <input name="nextDate" type="date" />
+          </label>
+          <label>
+            Proxima accion
+            <input name="nextAction" placeholder="Llamar, visitar, enviar propuesta..." />
+          </label>
+        </div>
+
+        <section class="form-section">
+          <span class="eyebrow">Agenda inicial opcional</span>
+          <div class="form-grid compact-grid">
+            <label>
+              Fecha
+              <input name="agendaDate" type="date" />
+            </label>
+            <label>
+              Hora
+              <input name="agendaTime" type="time" />
+            </label>
+            <label>
+              Tipo
+              <input name="agendaType" placeholder="Diagnostico, cierre..." />
+            </label>
+            <label>
+              Lugar
+              <input name="agendaPlace" placeholder="Cliente, llamada, showroom..." />
+            </label>
+          </div>
+        </section>
+
+        <label class="full-label">
+          Nota
+          <textarea name="lastNote" rows="3" placeholder="Contexto comercial, necesidad o siguiente paso"></textarea>
+        </label>
+
+        <div class="modal-actions">
+          <button type="button" id="deleteOpportunityButton" class="danger-button">Eliminar</button>
+          <span id="formMessage" class="form-message"></span>
+          <button type="button" id="cancelDialogButton" class="secondary-button">Cancelar</button>
+          <button type="submit" class="primary-button">Guardar oportunidad</button>
+        </div>
+      </form>
+    </dialog>
+
+    <dialog id="customerDialog" class="modal customer-modal">
+      <section class="customer-shell">
+        <div class="modal-header customer-modal-header">
+          <div>
+            <span class="eyebrow">Ficha del cliente</span>
+            <h2 id="customerDialogTitle">Cliente</h2>
+          </div>
+          <button type="button" id="closeCustomerDialogButton" class="icon-button" title="Cerrar">x</button>
+        </div>
+
+        <div class="customer-tabs" aria-label="Secciones de ficha">
+          <button type="button" class="is-active" data-customer-tab="info">Informacion</button>
+          <button type="button" data-customer-tab="history">Historial de pedidos</button>
+          <button type="button" data-customer-tab="actions">Gestiones</button>
+        </div>
+
+        <div id="customerDialogBody" class="customer-dialog-body"></div>
+      </section>
+    </dialog>
+
+    <script src="/app.js"></script>
+  </body>
+</html>

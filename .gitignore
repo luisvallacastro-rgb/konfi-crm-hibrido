@@ -1,0 +1,16 @@
+node_modules/
+.env
+.tmp/
+*.log
+
+mobile-app/.dart_tool/
+mobile-app/build/
+mobile-app/.flutter-plugins
+mobile-app/.flutter-plugins-dependencies
+mobile-app/.idea/
+mobile-app/ios/Flutter/Generated.xcconfig
+mobile-app/ios/Flutter/flutter_export_environment.sh
+mobile-app/ios/Flutter/ephemeral/
+
+docs-output/
+outputs/

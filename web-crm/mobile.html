@@ -1,0 +1,37 @@
+<!doctype html>
+<html lang="es">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>KONFI App Vendedor</title>
+    <link rel="stylesheet" href="/mobile.css" />
+  </head>
+  <body>
+    <main class="phone-shell">
+      <header class="mobile-header">
+        <div class="avatar">CR</div>
+        <div>
+          <span>Ejecutivo de ventas</span>
+          <h1>Agenda de campo</h1>
+        </div>
+        <button id="newMobileProspect" title="Nuevo prospecto">+</button>
+      </header>
+
+      <section id="summary" class="summary"></section>
+
+      <section class="tabs">
+        <button class="active" data-tab="agenda">Agenda</button>
+        <button data-tab="pipeline">Pipeline</button>
+        <button data-tab="forms">Formularios</button>
+      </section>
+
+      <section id="mobileContent" class="mobile-content"></section>
+    </main>
+
+    <dialog id="mobileDialog" class="mobile-dialog">
+      <div id="mobileDialogContent"></div>
+    </dialog>
+
+    <script src="/mobile.js"></script>
+  </body>
+</html>

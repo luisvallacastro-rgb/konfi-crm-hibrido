@@ -1,0 +1,18 @@
+services:
+  - type: web
+    name: induccion-gerencia-comercial
+    runtime: node
+    plan: free
+    buildCommand: npm install
+    startCommand: npm start
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: HOST
+        value: 0.0.0.0
+      - key: DATA_PATH
+        value: /var/data/konfi-crm-seed.json
+    disk:
+      name: konfi-crm-data
+      mountPath: /var/data
+      sizeGB: 1

@@ -1,0 +1,326 @@
+:root {
+  --ink: #eef8f5;
+  --muted: #9bb3ab;
+  --line: rgba(203, 244, 232, 0.15);
+  --line-strong: rgba(108, 240, 205, 0.32);
+  --green: #45d6a6;
+  --cyan: #51d7e8;
+  --dark: #071312;
+  --yellow: #f4c762;
+  --page: #050d0d;
+  --glass: blur(20px) saturate(140%);
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  min-height: 100vh;
+  display: grid;
+  place-items: center;
+  background:
+    radial-gradient(circle at 20% 8%, rgba(69, 214, 166, 0.2), transparent 32%),
+    radial-gradient(circle at 90% 20%, rgba(81, 215, 232, 0.17), transparent 34%),
+    linear-gradient(145deg, #06100f 0%, #0b191b 50%, #05080d 100%);
+  color: var(--ink);
+  font-family: Inter, Segoe UI, Arial, sans-serif;
+}
+
+button {
+  font: inherit;
+  transition: transform 0.18s ease, border-color 0.18s ease, background 0.18s ease;
+}
+
+button:hover {
+  transform: translateY(-1px);
+}
+
+.phone-shell {
+  position: relative;
+  width: min(430px, 100vw);
+  min-height: 100vh;
+  padding: 18px;
+  overflow: hidden;
+  background:
+    linear-gradient(rgba(255, 255, 255, 0.025) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255, 255, 255, 0.018) 1px, transparent 1px),
+    rgba(5, 13, 13, 0.76);
+  background-size: 42px 42px, 42px 42px, auto;
+  border-left: 1px solid rgba(255, 255, 255, 0.06);
+  border-right: 1px solid rgba(255, 255, 255, 0.06);
+  box-shadow: 0 24px 80px rgba(0, 0, 0, 0.46);
+}
+
+.phone-shell::before {
+  content: "";
+  position: absolute;
+  inset: -80px -40px auto auto;
+  width: 190px;
+  height: 190px;
+  border-radius: 999px;
+  background: rgba(69, 214, 166, 0.18);
+  filter: blur(32px);
+  pointer-events: none;
+}
+
+.mobile-header {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  gap: 12px;
+  align-items: center;
+}
+
+.mobile-header h1,
+.mobile-header span,
+p {
+  margin: 0;
+}
+
+.mobile-header h1 {
+  font-size: 24px;
+  line-height: 1.1;
+}
+
+.mobile-header span {
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.mobile-header button {
+  margin-left: auto;
+  width: 42px;
+  height: 42px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  color: var(--green);
+  background: rgba(255, 255, 255, 0.07);
+  backdrop-filter: var(--glass);
+}
+
+.avatar {
+  width: 48px;
+  height: 48px;
+  display: grid;
+  place-items: center;
+  border-radius: 14px;
+  color: #06100f;
+  background: linear-gradient(135deg, var(--yellow), var(--green));
+  font-weight: 900;
+  box-shadow: 0 14px 34px rgba(69, 214, 166, 0.2);
+}
+
+.summary {
+  position: relative;
+  z-index: 1;
+  margin: 18px 0;
+  padding: 16px;
+  border-radius: 18px;
+  background: rgba(13, 31, 30, 0.7);
+  color: #ffffff;
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 10px;
+  border: 1px solid var(--line);
+  box-shadow: 0 24px 60px rgba(0, 0, 0, 0.34);
+  backdrop-filter: var(--glass);
+}
+
+.summary span {
+  display: block;
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.summary strong {
+  font-size: 22px;
+}
+
+.tabs {
+  position: relative;
+  z-index: 1;
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 8px;
+  margin-bottom: 14px;
+}
+
+.tabs button {
+  min-height: 38px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.06);
+  color: var(--muted);
+  font-weight: 900;
+}
+
+.tabs button.active {
+  color: #04100f;
+  background: linear-gradient(135deg, var(--green), var(--cyan));
+  border-color: transparent;
+}
+
+.mobile-content {
+  position: relative;
+  z-index: 1;
+  display: grid;
+  gap: 12px;
+  padding-bottom: 18px;
+}
+
+.mobile-card {
+  border: 1px solid var(--line);
+  border-radius: 18px;
+  background: rgba(13, 31, 30, 0.66);
+  padding: 14px;
+  box-shadow: 0 18px 46px rgba(0, 0, 0, 0.34);
+  backdrop-filter: var(--glass);
+}
+
+.card-head {
+  display: flex;
+  gap: 10px;
+  align-items: flex-start;
+  justify-content: space-between;
+}
+
+.card-head h2 {
+  margin: 0;
+  font-size: 17px;
+}
+
+.badge {
+  padding: 5px 8px;
+  border-radius: 10px;
+  font-size: 12px;
+  font-weight: 900;
+  color: #ffb1b1;
+  background: rgba(255, 119, 119, 0.14);
+  border: 1px solid rgba(255, 119, 119, 0.22);
+}
+
+.meta {
+  color: var(--muted);
+  font-size: 13px;
+  margin-top: 5px;
+}
+
+.progress {
+  height: 8px;
+  background: rgba(255, 255, 255, 0.08);
+  border-radius: 10px;
+  overflow: hidden;
+  margin: 13px 0 9px;
+}
+
+.progress div {
+  height: 100%;
+  background: linear-gradient(90deg, var(--green), var(--cyan));
+}
+
+.actions {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+  margin-top: 12px;
+}
+
+.actions button {
+  min-height: 38px;
+  border-radius: 12px;
+  border: 1px solid var(--line);
+  color: var(--green);
+  background: rgba(255, 255, 255, 0.06);
+  font-weight: 900;
+}
+
+.actions button:first-child {
+  color: #04100f;
+  background: linear-gradient(135deg, var(--green), var(--cyan));
+  border-color: transparent;
+}
+
+.mini-grid {
+  display: grid;
+  gap: 10px;
+  margin-top: 12px;
+}
+
+.detail-row {
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  padding: 11px;
+  background: rgba(255, 255, 255, 0.05);
+}
+
+.detail-row span {
+  display: block;
+  color: var(--muted);
+  font-size: 12px;
+  margin-bottom: 3px;
+}
+
+.detail-row strong {
+  display: block;
+}
+
+.mobile-dialog {
+  width: min(410px, calc(100vw - 24px));
+  border: 1px solid var(--line-strong);
+  border-radius: 22px;
+  color: var(--ink);
+  background: rgba(8, 21, 20, 0.94);
+  box-shadow: 0 30px 80px rgba(0, 0, 0, 0.55);
+  backdrop-filter: var(--glass);
+  padding: 16px;
+}
+
+.mobile-dialog::backdrop {
+  background: rgba(0, 0, 0, 0.62);
+  backdrop-filter: blur(6px);
+}
+
+.mobile-dialog h2 {
+  margin: 0 0 4px;
+}
+
+.mobile-dialog label {
+  display: grid;
+  gap: 5px;
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 900;
+}
+
+.mobile-dialog input,
+.mobile-dialog textarea,
+.mobile-dialog select {
+  width: 100%;
+  min-height: 40px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  padding: 8px 10px;
+  color: var(--ink);
+  background: rgba(255, 255, 255, 0.07);
+}
+
+.mobile-dialog option {
+  color: #071312;
+}
+
+.dialog-actions {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+  margin-top: 12px;
+}
+
+@media (min-width: 700px) {
+  .phone-shell {
+    min-height: min(900px, calc(100vh - 28px));
+    border-radius: 28px;
+    margin: 14px;
+  }
+}
