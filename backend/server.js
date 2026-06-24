@@ -8,29 +8,77 @@ const HOST = process.env.HOST || "0.0.0.0";
 const rootDir = path.resolve(__dirname, "..");
 const webDir = path.join(rootDir, "web-crm");
 const seedPath = path.join(__dirname, "data", "seed.json");
-const dataPath = process.env.DATA_PATH
+const requestedDataPath = process.env.DATA_PATH
   ? path.resolve(process.env.DATA_PATH)
   : seedPath;
+let activeDataPath = requestedDataPath;
+
+function prepareDataPath(filePath) {
+  try {
+    if (!fs.existsSync(filePath)) {
+      fs.mkdirSync(path.dirname(filePath), { recursive: true });
+      fs.copyFileSync(seedPath, filePath);
+    }
+    return true;
+  } catch (error) {
+    console.warn(`No se pudo preparar DATA_PATH ${filePath}: ${error.message}`);
+    return false;
+  }
+}
 
 function ensureDataFile() {
-  if (fs.existsSync(dataPath)) {
-    return;
+  if (prepareDataPath(activeDataPath)) {
+    return activeDataPath;
   }
-  fs.mkdirSync(path.dirname(dataPath), { recursive: true });
-  fs.copyFileSync(seedPath, dataPath);
+
+  if (activeDataPath !== seedPath && prepareDataPath(seedPath)) {
+    console.warn(`Usando seed local como respaldo: ${seedPath}`);
+    activeDataPath = seedPath;
+    return activeDataPath;
+  }
+
+  throw new Error("No se pudo preparar el archivo de datos del CRM");
+}
+
+function parseJsonFile(filePath) {
+  const content = fs.readFileSync(filePath, "utf8").trim();
+  if (!content) {
+    throw new Error(`Archivo JSON vacio: ${filePath}`);
+  }
+  return JSON.parse(content);
 }
 
 function readData() {
-  ensureDataFile();
-  const data = JSON.parse(fs.readFileSync(dataPath, "utf8"));
+  const filePath = ensureDataFile();
+  let data;
+
+  try {
+    data = parseJsonFile(filePath);
+  } catch (error) {
+    console.warn(`No se pudo leer ${filePath}: ${error.message}`);
+    if (filePath === seedPath) {
+      throw error;
+    }
+    data = parseJsonFile(seedPath);
+  }
+
   data.gestiones = Array.isArray(data.gestiones) ? data.gestiones : [];
   data.customers = Array.isArray(data.customers) ? data.customers : [];
   return data;
 }
 
 function writeData(data) {
-  fs.mkdirSync(path.dirname(dataPath), { recursive: true });
-  fs.writeFileSync(dataPath, `${JSON.stringify(data, null, 2)}\n`, "utf8");
+  const filePath = ensureDataFile();
+  try {
+    fs.writeFileSync(filePath, `${JSON.stringify(data, null, 2)}\n`, "utf8");
+  } catch (error) {
+    if (filePath === seedPath) {
+      throw error;
+    }
+    console.warn(`No se pudo escribir ${filePath}: ${error.message}`);
+    activeDataPath = seedPath;
+    fs.writeFileSync(seedPath, `${JSON.stringify(data, null, 2)}\n`, "utf8");
+  }
 }
 
 function readBody(req) {
@@ -372,14 +420,14 @@ function normalizeGestion(input, existing = {}) {
 }
 
 async function handleApi(req, res, url) {
-  const data = readData();
-  const model = buildViewModel(data);
-  const parts = url.pathname.split("/").filter(Boolean);
-
   if (url.pathname === "/api/health") {
     sendJson(res, { ok: true, service: "konfi-crm-api", timestamp: new Date().toISOString() });
     return;
   }
+
+  const data = readData();
+  const model = buildViewModel(data);
+  const parts = url.pathname.split("/").filter(Boolean);
 
   if (url.pathname === "/api/bootstrap") {
     sendJson(res, model);
@@ -733,7 +781,14 @@ const server = http.createServer((req, res) => {
   }
 
   if (url.pathname.startsWith("/api/")) {
-    handleApi(req, res, url);
+    handleApi(req, res, url).catch((error) => {
+      console.error(error);
+      if (!res.headersSent) {
+        sendJson(res, { error: "Internal server error" }, 500);
+      } else {
+        res.end();
+      }
+    });
     return;
   }
 

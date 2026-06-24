@@ -1,6 +1,6 @@
 services:
   - type: web
-    name: induccion-gerencia-comercial
+    name: konfi-crm-hibrido
     runtime: node
     plan: free
     buildCommand: npm install
@@ -10,9 +10,3 @@ services:
         value: production
       - key: HOST
         value: 0.0.0.0
-      - key: DATA_PATH
-        value: /var/data/konfi-crm-seed.json
-    disk:
-      name: konfi-crm-data
-      mountPath: /var/data
-      sizeGB: 1
