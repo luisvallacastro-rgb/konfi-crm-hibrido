@@ -14,6 +14,8 @@ const apiPathPrefix = String.fromEnvironment(
   'API_PATH_PREFIX',
   defaultValue: '/api/crm',
 );
+const previewUsername = String.fromEnvironment('PREVIEW_USERNAME');
+const previewPassword = String.fromEnvironment('PREVIEW_PASSWORD');
 
 void main() {
   runApp(const KonfiSalesApp());
@@ -82,7 +84,40 @@ class _SalesShellState extends State<SalesShell> {
   @override
   void initState() {
     super.initState();
-    unawaited(loadStore());
+    unawaited(loadInitialSession());
+  }
+
+  Future<void> loadInitialSession() async {
+    if (previewUsername.isEmpty || previewPassword.isEmpty) {
+      await loadStore();
+      return;
+    }
+
+    try {
+      final loaded = await api.login(
+        const LoginDraft(
+          username: previewUsername,
+          password: previewPassword,
+        ),
+        previous: store,
+      );
+      if (!mounted) return;
+      final loggedSeller = loaded.currentSeller;
+      setState(() {
+        registeredSeller = loggedSeller;
+        store = loaded.withSeller(loggedSeller);
+        offlineReason = null;
+        loading = false;
+        tabIndex = 0;
+      });
+    } catch (_) {
+      if (!mounted) return;
+      await loadStore();
+      if (!mounted) return;
+      setState(() {
+        offlineReason = 'No se pudo abrir la vista previa de $previewUsername.';
+      });
+    }
   }
 
   @override
