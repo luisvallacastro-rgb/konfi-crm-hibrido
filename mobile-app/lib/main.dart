@@ -7,7 +7,11 @@ import 'package:http/http.dart' as http;
 
 const apiBaseUrl = String.fromEnvironment(
   'API_BASE_URL',
-  defaultValue: 'http://127.0.0.1:4180',
+  defaultValue: 'http://127.0.0.1:8099',
+);
+const apiPathPrefix = String.fromEnvironment(
+  'API_PATH_PREFIX',
+  defaultValue: '/api/crm',
 );
 
 void main() {
@@ -155,10 +159,7 @@ class _SalesShellState extends State<SalesShell> {
                     onRetry: () => unawaited(loadStore()),
                   ),
                 Expanded(
-                  child: IndexedStack(
-                    index: tabIndex,
-                    children: pages,
-                  ),
+                  child: IndexedStack(index: tabIndex, children: pages),
                 ),
               ],
             ),
@@ -604,9 +605,15 @@ class SalesBottomNav extends StatelessWidget {
 
   static const items = [
     _SalesNavItem(
-        Icons.business_center_outlined, Icons.business_center, 'Cartera'),
+      Icons.business_center_outlined,
+      Icons.business_center,
+      'Cartera',
+    ),
     _SalesNavItem(
-        Icons.calendar_today_outlined, Icons.calendar_today, 'Agenda'),
+      Icons.calendar_today_outlined,
+      Icons.calendar_today,
+      'Agenda',
+    ),
     _SalesNavItem(Icons.view_kanban_outlined, Icons.view_kanban, 'Etapas'),
     _SalesNavItem(Icons.assignment_outlined, Icons.assignment, 'Forms'),
     _SalesNavItem(Icons.query_stats_outlined, Icons.query_stats, 'KPIs'),
@@ -740,8 +747,9 @@ class SellerRegistrationPage extends StatefulWidget {
 }
 
 class _SellerRegistrationPageState extends State<SellerRegistrationPage> {
-  final loginUserController =
-      TextEditingController(text: 'valladares@anlitikbi.com');
+  final loginUserController = TextEditingController(
+    text: 'valladares@anlitikbi.com',
+  );
   final loginPasswordController = TextEditingController(text: '130688Kmila');
   final firstNameController = TextEditingController();
   final lastNameController = TextEditingController();
@@ -791,23 +799,27 @@ class _SellerRegistrationPageState extends State<SellerRegistrationPage> {
 
   @override
   Widget build(BuildContext context) {
-    final seller = selectedSeller ??
+    final seller =
+        selectedSeller ??
         (availableSellers.isEmpty
             ? widget.store.currentSeller
             : availableSellers.first);
-    final assignedAgenda =
-        widget.store.agenda.where((item) => item.ownerId == seller.id).length;
+    final assignedAgenda = widget.store.agenda
+        .where((item) => item.ownerId == seller.id)
+        .length;
     final assignedPipeline = widget.store.opportunities
         .where((item) => item.ownerId == seller.id)
         .fold<double>(0, (sum, item) => sum + item.amount);
     final draftName =
         '${firstNameController.text.trim()} ${lastNameController.text.trim()}'
             .trim();
-    final registrationInitials =
-        draftName.isEmpty ? 'KV' : SalesUser.initialsFromName(draftName);
+    final registrationInitials = draftName.isEmpty
+        ? 'KV'
+        : SalesUser.initialsFromName(draftName);
     final title = registerMode ? 'Crea tu cuenta' : 'Bienvenido';
-    final subtitle =
-        registerMode ? 'Primer ingreso a KONFI Ventas' : 'Ingresa a tu agenda';
+    final subtitle = registerMode
+        ? 'Primer ingreso a KONFI Ventas'
+        : 'Ingresa a tu agenda';
 
     return ListView(
       padding: const EdgeInsets.fromLTRB(18, 24, 18, 24),
@@ -824,7 +836,9 @@ class _SellerRegistrationPageState extends State<SellerRegistrationPage> {
                   Text(
                     title,
                     style: const TextStyle(
-                        fontSize: 25, fontWeight: FontWeight.w900),
+                      fontSize: 25,
+                      fontWeight: FontWeight.w900,
+                    ),
                   ),
                   const SizedBox(height: 3),
                   Text(
@@ -844,21 +858,27 @@ class _SellerRegistrationPageState extends State<SellerRegistrationPage> {
         const SizedBox(height: 12),
         TextButton.icon(
           onPressed: () => setState(() => registerMode = !registerMode),
-          icon: Icon(registerMode
-              ? Icons.login_outlined
-              : Icons.person_add_alt_1_outlined),
-          label: Text(registerMode
-              ? 'Ya tengo usuario y contrasena'
-              : 'Crear una cuenta nueva'),
+          icon: Icon(
+            registerMode
+                ? Icons.login_outlined
+                : Icons.person_add_alt_1_outlined,
+          ),
+          label: Text(
+            registerMode
+                ? 'Ya tengo usuario y contrasena'
+                : 'Crear una cuenta nueva',
+          ),
         ),
         TextButton.icon(
           onPressed: () => setState(() => showExisting = !showExisting),
-          icon: Icon(showExisting
-              ? Icons.keyboard_arrow_up
-              : Icons.keyboard_arrow_down),
-          label: Text(showExisting
-              ? 'Ocultar perfiles existentes'
-              : 'Ya tengo un perfil creado'),
+          icon: Icon(
+            showExisting ? Icons.keyboard_arrow_up : Icons.keyboard_arrow_down,
+          ),
+          label: Text(
+            showExisting
+                ? 'Ocultar perfiles existentes'
+                : 'Ya tengo un perfil creado',
+          ),
         ),
         if (showExisting)
           GlassCard(
@@ -879,10 +899,7 @@ class _SellerRegistrationPageState extends State<SellerRegistrationPage> {
                   ),
                   items: [
                     for (final item in availableSellers)
-                      DropdownMenuItem(
-                        value: item,
-                        child: Text(item.name),
-                      ),
+                      DropdownMenuItem(value: item, child: Text(item.name)),
                   ],
                   onChanged: (value) {
                     if (value == null) return;
@@ -975,9 +992,11 @@ class _SellerRegistrationPageState extends State<SellerRegistrationPage> {
               tooltip: showLoginPassword ? 'Ocultar' : 'Mostrar',
               onPressed: () =>
                   setState(() => showLoginPassword = !showLoginPassword),
-              icon: Icon(showLoginPassword
-                  ? Icons.visibility_off_outlined
-                  : Icons.visibility_outlined),
+              icon: Icon(
+                showLoginPassword
+                    ? Icons.visibility_off_outlined
+                    : Icons.visibility_outlined,
+              ),
             ),
           ),
           obscureText: !showLoginPassword,
@@ -1077,9 +1096,11 @@ class _SellerRegistrationPageState extends State<SellerRegistrationPage> {
               tooltip: showRegisterPassword ? 'Ocultar' : 'Mostrar',
               onPressed: () =>
                   setState(() => showRegisterPassword = !showRegisterPassword),
-              icon: Icon(showRegisterPassword
-                  ? Icons.visibility_off_outlined
-                  : Icons.visibility_outlined),
+              icon: Icon(
+                showRegisterPassword
+                    ? Icons.visibility_off_outlined
+                    : Icons.visibility_outlined,
+              ),
             ),
           ),
           obscureText: !showRegisterPassword,
@@ -1095,9 +1116,11 @@ class _SellerRegistrationPageState extends State<SellerRegistrationPage> {
               tooltip: showConfirmPassword ? 'Ocultar' : 'Mostrar',
               onPressed: () =>
                   setState(() => showConfirmPassword = !showConfirmPassword),
-              icon: Icon(showConfirmPassword
-                  ? Icons.visibility_off_outlined
-                  : Icons.visibility_outlined),
+              icon: Icon(
+                showConfirmPassword
+                    ? Icons.visibility_off_outlined
+                    : Icons.visibility_outlined,
+              ),
             ),
           ),
           obscureText: !showConfirmPassword,
@@ -1214,11 +1237,7 @@ class _SellerRegistrationPageState extends State<SellerRegistrationPage> {
 }
 
 class SessionMetric extends StatelessWidget {
-  const SessionMetric({
-    required this.label,
-    required this.value,
-    super.key,
-  });
+  const SessionMetric({required this.label, required this.value, super.key});
 
   final String label;
   final String value;
@@ -1235,9 +1254,10 @@ class SessionMetric extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(value,
-              style:
-                  const TextStyle(fontSize: 22, fontWeight: FontWeight.w900)),
+          Text(
+            value,
+            style: const TextStyle(fontSize: 22, fontWeight: FontWeight.w900),
+          ),
           const SizedBox(height: 3),
           Text(label, style: const TextStyle(color: AppColors.muted)),
         ],
@@ -1256,11 +1276,7 @@ class DarkBackdrop extends StatelessWidget {
         gradient: LinearGradient(
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
-          colors: [
-            Color(0xFF06100F),
-            Color(0xFF0B191B),
-            Color(0xFF05080D),
-          ],
+          colors: [Color(0xFF06100F), Color(0xFF0B191B), Color(0xFF05080D)],
         ),
       ),
       child: Stack(
@@ -1268,20 +1284,26 @@ class DarkBackdrop extends StatelessWidget {
           Positioned(
             top: -80,
             left: -40,
-            child:
-                Glow(color: AppColors.green.withValues(alpha: 0.22), size: 220),
+            child: Glow(
+              color: AppColors.green.withValues(alpha: 0.22),
+              size: 220,
+            ),
           ),
           Positioned(
             top: 80,
             right: -70,
-            child:
-                Glow(color: AppColors.cyan.withValues(alpha: 0.18), size: 240),
+            child: Glow(
+              color: AppColors.cyan.withValues(alpha: 0.18),
+              size: 240,
+            ),
           ),
           Positioned(
             bottom: -90,
             right: 30,
             child: Glow(
-                color: AppColors.yellow.withValues(alpha: 0.12), size: 260),
+              color: AppColors.yellow.withValues(alpha: 0.12),
+              size: 260,
+            ),
           ),
         ],
       ),
@@ -1300,10 +1322,7 @@ class Glow extends StatelessWidget {
     return Container(
       width: size,
       height: size,
-      decoration: BoxDecoration(
-        color: color,
-        shape: BoxShape.circle,
-      ),
+      decoration: BoxDecoration(color: color, shape: BoxShape.circle),
       child: BackdropFilter(
         filter: ImageFilter.blur(sigmaX: 34, sigmaY: 34),
         child: const SizedBox.expand(),
@@ -1364,11 +1383,7 @@ class AppHeader extends StatelessWidget {
 }
 
 class InitialsAvatar extends StatelessWidget {
-  const InitialsAvatar({
-    required this.initials,
-    this.size = 48,
-    super.key,
-  });
+  const InitialsAvatar({required this.initials, this.size = 48, super.key});
 
   final String initials;
   final double size;
@@ -1464,8 +1479,9 @@ class OpportunitiesPage extends StatelessWidget {
               child: Column(
                 children: [
                   const EmptyBlock(
-                      text:
-                          'Aun no tienes oportunidades vigentes asignadas desde CRM.'),
+                    text:
+                        'Aun no tienes oportunidades vigentes asignadas desde CRM.',
+                  ),
                   const SizedBox(height: 12),
                   SizedBox(
                     width: double.infinity,
@@ -1512,8 +1528,10 @@ class OpportunitiesPage extends StatelessWidget {
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Text('Notificaciones CRM',
-                style: TextStyle(fontSize: 21, fontWeight: FontWeight.w900)),
+            const Text(
+              'Notificaciones CRM',
+              style: TextStyle(fontSize: 21, fontWeight: FontWeight.w900),
+            ),
             const SizedBox(height: 6),
             Text(
               'Cartera asignada a ${store.currentSeller.name}',
@@ -1532,18 +1550,23 @@ class OpportunitiesPage extends StatelessWidget {
                     padding: const EdgeInsets.all(12),
                     child: Row(
                       children: [
-                        const Icon(Icons.assignment_turned_in_outlined,
-                            color: AppColors.green),
+                        const Icon(
+                          Icons.assignment_turned_in_outlined,
+                          color: AppColors.green,
+                        ),
                         const SizedBox(width: 10),
                         Expanded(
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-                              Text(opportunity.company,
-                                  maxLines: 1,
-                                  overflow: TextOverflow.ellipsis,
-                                  style: const TextStyle(
-                                      fontWeight: FontWeight.w900)),
+                              Text(
+                                opportunity.company,
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: const TextStyle(
+                                  fontWeight: FontWeight.w900,
+                                ),
+                              ),
                               Text(
                                 '${opportunity.amountLabel} - Etapa ${opportunity.stageId}',
                                 style: const TextStyle(color: AppColors.muted),
@@ -1556,8 +1579,10 @@ class OpportunitiesPage extends StatelessWidget {
                   ),
                 ),
             if (opportunities.length > 6)
-              Text('+${opportunities.length - 6} oportunidades adicionales',
-                  style: const TextStyle(color: AppColors.muted)),
+              Text(
+                '+${opportunities.length - 6} oportunidades adicionales',
+                style: const TextStyle(color: AppColors.muted),
+              ),
           ],
         ),
       ),
@@ -1599,19 +1624,26 @@ class OpportunityListCard extends StatelessWidget {
                       color: AppColors.green.withValues(alpha: 0.13),
                       borderRadius: BorderRadius.circular(14),
                       border: Border.all(
-                          color: AppColors.green.withValues(alpha: 0.2)),
+                        color: AppColors.green.withValues(alpha: 0.2),
+                      ),
                     ),
-                    child: const Icon(Icons.business_center_outlined,
-                        color: AppColors.green),
+                    child: const Icon(
+                      Icons.business_center_outlined,
+                      color: AppColors.green,
+                    ),
                   ),
                   const SizedBox(width: 12),
                   Expanded(
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Text(opportunity.company,
-                            style: const TextStyle(
-                                fontSize: 17, fontWeight: FontWeight.w900)),
+                        Text(
+                          opportunity.company,
+                          style: const TextStyle(
+                            fontSize: 17,
+                            fontWeight: FontWeight.w900,
+                          ),
+                        ),
                         const SizedBox(height: 3),
                         Text(
                           opportunity.product.isEmpty
@@ -1649,8 +1681,10 @@ class OpportunityListCard extends StatelessWidget {
               ),
               if (opportunity.strategy.isNotEmpty) ...[
                 const SizedBox(height: 4),
-                Text(opportunity.strategy,
-                    style: const TextStyle(color: AppColors.muted)),
+                Text(
+                  opportunity.strategy,
+                  style: const TextStyle(color: AppColors.muted),
+                ),
               ],
             ],
           ),
@@ -1691,7 +1725,7 @@ class AgendaPage extends StatefulWidget {
 
   final SalesStore store;
   final Future<void> Function(String agendaId, VisitStatus status)
-      onStatusChange;
+  onStatusChange;
   final ValueChanged<String> onOpenOpportunity;
   final ValueChanged<int> onCaptureForm;
   final VoidCallback onNewGestion;
@@ -1732,8 +1766,9 @@ class _AgendaPageState extends State<AgendaPage> {
               tooltip: 'Filtrar fecha exacta',
               onPressed: pickExactDate,
               style: IconButton.styleFrom(
-                backgroundColor:
-                    selectedDate == null ? AppColors.green : AppColors.cyan,
+                backgroundColor: selectedDate == null
+                    ? AppColors.green
+                    : AppColors.cyan,
               ),
               icon: const Icon(Icons.calendar_month_outlined),
             ),
@@ -1768,9 +1803,9 @@ class _AgendaPageState extends State<AgendaPage> {
       builder: (context, child) => Theme(
         data: Theme.of(context).copyWith(
           colorScheme: Theme.of(context).colorScheme.copyWith(
-                primary: AppColors.green,
-                surface: AppColors.surface,
-              ),
+            primary: AppColors.green,
+            surface: AppColors.surface,
+          ),
         ),
         child: child ?? const SizedBox.shrink(),
       ),
@@ -1809,14 +1844,20 @@ class SummaryPanel extends StatelessWidget {
       child: Row(
         children: [
           Expanded(
-              child: SummaryMetric(
-                  label: 'Visitas', value: '${store.myAgenda.length}')),
+            child: SummaryMetric(
+              label: 'Visitas',
+              value: '${store.myAgenda.length}',
+            ),
+          ),
           Expanded(
-              child: SummaryMetric(
-                  label: 'En campo', value: '${store.inVisitCount}')),
+            child: SummaryMetric(
+              label: 'En campo',
+              value: '${store.inVisitCount}',
+            ),
+          ),
           Expanded(
-              child:
-                  SummaryMetric(label: 'Pipeline', value: store.pipelineLabel)),
+            child: SummaryMetric(label: 'Pipeline', value: store.pipelineLabel),
+          ),
         ],
       ),
     );
@@ -1824,11 +1865,7 @@ class SummaryPanel extends StatelessWidget {
 }
 
 class SummaryMetric extends StatelessWidget {
-  const SummaryMetric({
-    required this.label,
-    required this.value,
-    super.key,
-  });
+  const SummaryMetric({required this.label, required this.value, super.key});
 
   final String label;
   final String value;
@@ -1875,13 +1912,17 @@ class FilterBar extends StatelessWidget {
                   foregroundColor: selected == value
                       ? const Color(0xFF04100F)
                       : AppColors.muted,
-                  backgroundColor:
-                      selected == value ? AppColors.green : Colors.transparent,
+                  backgroundColor: selected == value
+                      ? AppColors.green
+                      : Colors.transparent,
                   shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(12)),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
                 ),
-                child: Text(value,
-                    style: const TextStyle(fontWeight: FontWeight.w900)),
+                child: Text(
+                  value,
+                  style: const TextStyle(fontWeight: FontWeight.w900),
+                ),
               ),
             ),
         ],
@@ -1904,7 +1945,7 @@ class AgendaTimeline extends StatelessWidget {
   final SalesStore store;
   final ValueChanged<String> onOpenOpportunity;
   final Future<void> Function(String agendaId, VisitStatus status)
-      onStatusChange;
+  onStatusChange;
   final ValueChanged<int> onCaptureForm;
 
   @override
@@ -2029,7 +2070,7 @@ class _ScheduleRow extends StatelessWidget {
   final Opportunity? opportunity;
   final ValueChanged<String> onOpenOpportunity;
   final Future<void> Function(String agendaId, VisitStatus status)
-      onStatusChange;
+  onStatusChange;
   final ValueChanged<int> onCaptureForm;
 
   @override
@@ -2054,13 +2095,18 @@ class _ScheduleRow extends StatelessWidget {
             child: Column(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                Text(slot,
-                    style: const TextStyle(
-                        fontSize: 12, fontWeight: FontWeight.w900)),
+                Text(
+                  slot,
+                  style: const TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w900,
+                  ),
+                ),
                 const SizedBox(height: 3),
-                Text(_endTime(slot),
-                    style:
-                        const TextStyle(color: AppColors.muted, fontSize: 11)),
+                Text(
+                  _endTime(slot),
+                  style: const TextStyle(color: AppColors.muted, fontSize: 11),
+                ),
               ],
             ),
           ),
@@ -2078,9 +2124,10 @@ class _ScheduleRow extends StatelessWidget {
                       ? Colors.white.withValues(alpha: 0.055)
                       : Colors.white.withValues(alpha: 0.025),
                   border: Border.all(
-                      color: hasTask
-                          ? AppColors.line
-                          : AppColors.line.withValues(alpha: 0.55)),
+                    color: hasTask
+                        ? AppColors.line
+                        : AppColors.line.withValues(alpha: 0.55),
+                  ),
                   borderRadius: BorderRadius.circular(8),
                 ),
                 child: IntrinsicHeight(
@@ -2131,8 +2178,13 @@ class _ScheduleRow extends StatelessWidget {
     final parts = time.split(':');
     final hour = int.tryParse(parts.first) ?? 9;
     final minute = parts.length > 1 ? int.tryParse(parts[1]) ?? 0 : 0;
-    final end =
-        DateTime(2026, 1, 1, hour, minute).add(const Duration(minutes: 45));
+    final end = DateTime(
+      2026,
+      1,
+      1,
+      hour,
+      minute,
+    ).add(const Duration(minutes: 45));
     return '${end.hour.toString().padLeft(2, '0')}:${end.minute.toString().padLeft(2, '0')}';
   }
 }
@@ -2148,7 +2200,7 @@ class _TaskContent extends StatelessWidget {
   final AgendaItem item;
   final Opportunity opportunity;
   final Future<void> Function(String agendaId, VisitStatus status)
-      onStatusChange;
+  onStatusChange;
   final ValueChanged<int> onCaptureForm;
 
   @override
@@ -2265,7 +2317,9 @@ class AgendaCard extends StatelessWidget {
                         Text(
                           opportunity.company,
                           style: const TextStyle(
-                              fontSize: 17, fontWeight: FontWeight.w900),
+                            fontSize: 17,
+                            fontWeight: FontWeight.w900,
+                          ),
                         ),
                         const SizedBox(height: 4),
                         Text(
@@ -2286,8 +2340,10 @@ class AgendaCard extends StatelessWidget {
                 style: const TextStyle(fontWeight: FontWeight.w800),
               ),
               const SizedBox(height: 4),
-              Text(opportunity.nextAction,
-                  style: const TextStyle(color: AppColors.muted)),
+              Text(
+                opportunity.nextAction,
+                style: const TextStyle(color: AppColors.muted),
+              ),
               const SizedBox(height: 12),
               Row(
                 children: [
@@ -2461,8 +2517,10 @@ class MiniOpportunityTile extends StatelessWidget {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(opportunity.company,
-                      style: const TextStyle(fontWeight: FontWeight.w900)),
+                  Text(
+                    opportunity.company,
+                    style: const TextStyle(fontWeight: FontWeight.w900),
+                  ),
                   const SizedBox(height: 3),
                   Text(
                     '${opportunity.temperature} - ${opportunity.priority}',
@@ -2471,8 +2529,10 @@ class MiniOpportunityTile extends StatelessWidget {
                 ],
               ),
             ),
-            Text(opportunity.amountLabel,
-                style: const TextStyle(fontWeight: FontWeight.w900)),
+            Text(
+              opportunity.amountLabel,
+              style: const TextStyle(fontWeight: FontWeight.w900),
+            ),
           ],
         ),
       ),
@@ -2508,12 +2568,18 @@ class FormsPage extends StatelessWidget {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(form.name,
-                      style: const TextStyle(
-                          fontSize: 17, fontWeight: FontWeight.w900)),
+                  Text(
+                    form.name,
+                    style: const TextStyle(
+                      fontSize: 17,
+                      fontWeight: FontWeight.w900,
+                    ),
+                  ),
                   const SizedBox(height: 4),
-                  Text('Etapa ${form.stageId}',
-                      style: const TextStyle(color: AppColors.muted)),
+                  Text(
+                    'Etapa ${form.stageId}',
+                    style: const TextStyle(color: AppColors.muted),
+                  ),
                   const SizedBox(height: 10),
                   Wrap(
                     spacing: 6,
@@ -2534,8 +2600,9 @@ class FormsPage extends StatelessWidget {
                       ),
                       const SizedBox(width: 8),
                       CountPill(
-                          value:
-                              '${store.formResponses[form.id]?.length ?? 0} registros'),
+                        value:
+                            '${store.formResponses[form.id]?.length ?? 0} registros',
+                      ),
                     ],
                   ),
                 ],
@@ -2589,8 +2656,10 @@ class KpiPage extends StatelessWidget {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              const Text('Conversion por etapa',
-                  style: TextStyle(fontWeight: FontWeight.w900)),
+              const Text(
+                'Conversion por etapa',
+                style: TextStyle(fontWeight: FontWeight.w900),
+              ),
               const SizedBox(height: 12),
               for (final stage in store.stages)
                 Padding(
@@ -2598,9 +2667,12 @@ class KpiPage extends StatelessWidget {
                   child: Row(
                     children: [
                       SizedBox(
-                          width: 118,
-                          child: Text(stage.name,
-                              overflow: TextOverflow.ellipsis)),
+                        width: 118,
+                        child: Text(
+                          stage.name,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
                       Expanded(
                         child: StageProgress(
                           stageId: store.myOpportunities
@@ -2634,12 +2706,15 @@ class KpiCard extends StatelessWidget {
         children: [
           Text(metric.label, style: const TextStyle(color: AppColors.muted)),
           const Spacer(),
-          Text(metric.value,
-              style:
-                  const TextStyle(fontSize: 24, fontWeight: FontWeight.w900)),
+          Text(
+            metric.value,
+            style: const TextStyle(fontSize: 24, fontWeight: FontWeight.w900),
+          ),
           const SizedBox(height: 3),
-          Text(metric.hint,
-              style: const TextStyle(color: AppColors.muted, fontSize: 12)),
+          Text(
+            metric.hint,
+            style: const TextStyle(color: AppColors.muted, fontSize: 12),
+          ),
         ],
       ),
     );
@@ -2662,7 +2737,7 @@ class OpportunityActionSheet extends StatefulWidget {
   final AgendaItem? agenda;
   final Future<void> Function(String result, String note) onSaveResult;
   final Future<void> Function(String agendaId, VisitStatus status)
-      onStatusChange;
+  onStatusChange;
   final VoidCallback onCaptureForm;
 
   @override
@@ -2688,16 +2763,20 @@ class _OpportunityActionSheetState extends State<OpportunityActionSheet> {
         crossAxisAlignment: CrossAxisAlignment.start,
         mainAxisSize: MainAxisSize.min,
         children: [
-          Text(opportunity.company,
-              style:
-                  const TextStyle(fontSize: 22, fontWeight: FontWeight.w900)),
+          Text(
+            opportunity.company,
+            style: const TextStyle(fontSize: 22, fontWeight: FontWeight.w900),
+          ),
           const SizedBox(height: 4),
-          Text('${opportunity.contact} - ${opportunity.phone}',
-              style: const TextStyle(color: AppColors.muted)),
+          Text(
+            '${opportunity.contact} - ${opportunity.phone}',
+            style: const TextStyle(color: AppColors.muted),
+          ),
           const SizedBox(height: 14),
           DetailTile(
-              label: 'Etapa',
-              value: '${opportunity.stageId}. ${opportunity.stageName}'),
+            label: 'Etapa',
+            value: '${opportunity.stageId}. ${opportunity.stageName}',
+          ),
           DetailTile(label: 'Producto', value: opportunity.product),
           DetailTile(label: 'Venta probable', value: opportunity.amountLabel),
           DetailTile(label: '% cierre', value: '${opportunity.closePercent}%'),
@@ -2714,10 +2793,12 @@ class _OpportunityActionSheetState extends State<OpportunityActionSheet> {
                 tooltip: 'Check-in',
                 onPressed: widget.agenda == null
                     ? null
-                    : () => unawaited(widget.onStatusChange(
+                    : () => unawaited(
+                        widget.onStatusChange(
                           widget.agenda!.id,
                           VisitStatus.inVisit,
-                        )),
+                        ),
+                      ),
                 icon: const Icon(Icons.location_on_outlined),
               ),
               const SizedBox(width: 12),
@@ -2725,10 +2806,12 @@ class _OpportunityActionSheetState extends State<OpportunityActionSheet> {
                 tooltip: 'Marcar realizada',
                 onPressed: widget.agenda == null
                     ? null
-                    : () => unawaited(widget.onStatusChange(
+                    : () => unawaited(
+                        widget.onStatusChange(
                           widget.agenda!.id,
                           VisitStatus.done,
-                        )),
+                        ),
+                      ),
                 icon: const Icon(Icons.check_circle_outline),
               ),
               const SizedBox(width: 12),
@@ -2752,16 +2835,25 @@ class _OpportunityActionSheetState extends State<OpportunityActionSheet> {
             decoration: const InputDecoration(labelText: 'Resultado de visita'),
             items: const [
               DropdownMenuItem(
-                  value: 'Sin resultado', child: Text('Sin resultado')),
+                value: 'Sin resultado',
+                child: Text('Sin resultado'),
+              ),
               DropdownMenuItem(
-                  value: 'Necesita cotizacion',
-                  child: Text('Necesita cotizacion')),
+                value: 'Necesita cotizacion',
+                child: Text('Necesita cotizacion'),
+              ),
               DropdownMenuItem(
-                  value: 'Objecion precio', child: Text('Objecion precio')),
+                value: 'Objecion precio',
+                child: Text('Objecion precio'),
+              ),
               DropdownMenuItem(
-                  value: 'Enviar muestras', child: Text('Enviar muestras')),
+                value: 'Enviar muestras',
+                child: Text('Enviar muestras'),
+              ),
               DropdownMenuItem(
-                  value: 'Listo para cierre', child: Text('Listo para cierre')),
+                value: 'Listo para cierre',
+                child: Text('Listo para cierre'),
+              ),
             ],
             onChanged: (value) => setState(() => result = value ?? result),
           ),
@@ -2811,7 +2903,8 @@ class _ScheduledGestionSheetState extends State<ScheduledGestionSheet> {
   String? opportunityId;
   String type = 'Visita';
   final date = TextEditingController(
-      text: DateTime.now().toIso8601String().substring(0, 10));
+    text: DateTime.now().toIso8601String().substring(0, 10),
+  );
   final time = TextEditingController(text: '09:00');
   final place = TextEditingController(text: 'Cliente');
   final note = TextEditingController();
@@ -2841,11 +2934,15 @@ class _ScheduledGestionSheetState extends State<ScheduledGestionSheet> {
         mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text('Nueva gestion',
-              style: TextStyle(fontSize: 22, fontWeight: FontWeight.w900)),
+          const Text(
+            'Nueva gestion',
+            style: TextStyle(fontSize: 22, fontWeight: FontWeight.w900),
+          ),
           const SizedBox(height: 6),
-          const Text('Selecciona una oportunidad antes de agendar.',
-              style: TextStyle(color: AppColors.muted)),
+          const Text(
+            'Selecciona una oportunidad antes de agendar.',
+            style: TextStyle(color: AppColors.muted),
+          ),
           const SizedBox(height: 14),
           if (opportunities.isEmpty)
             const EmptyBlock(
@@ -2859,8 +2956,10 @@ class _ScheduledGestionSheetState extends State<ScheduledGestionSheet> {
                 for (final opportunity in opportunities)
                   DropdownMenuItem(
                     value: opportunity.id,
-                    child: Text(opportunity.company,
-                        overflow: TextOverflow.ellipsis),
+                    child: Text(
+                      opportunity.company,
+                      overflow: TextOverflow.ellipsis,
+                    ),
                   ),
               ],
               onChanged: (value) => setState(() => opportunityId = value),
@@ -2921,8 +3020,10 @@ class _ScheduledGestionSheetState extends State<ScheduledGestionSheet> {
                 onPressed: () {
                   final selected = opportunityId;
                   if (selected == null || selected.isEmpty) {
-                    setState(() =>
-                        message = 'Selecciona una oportunidad para programar.');
+                    setState(
+                      () => message =
+                          'Selecciona una oportunidad para programar.',
+                    );
                     return;
                   }
                   widget.onSave(
@@ -2948,11 +3049,7 @@ class _ScheduledGestionSheetState extends State<ScheduledGestionSheet> {
 }
 
 class FormCaptureSheet extends StatefulWidget {
-  const FormCaptureSheet({
-    required this.form,
-    required this.onSave,
-    super.key,
-  });
+  const FormCaptureSheet({required this.form, required this.onSave, super.key});
 
   final StageForm form;
   final ValueChanged<Map<String, String>> onSave;
@@ -2987,12 +3084,15 @@ class _FormCaptureSheetState extends State<FormCaptureSheet> {
         mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(widget.form.name,
-              style:
-                  const TextStyle(fontSize: 22, fontWeight: FontWeight.w900)),
+          Text(
+            widget.form.name,
+            style: const TextStyle(fontSize: 22, fontWeight: FontWeight.w900),
+          ),
           const SizedBox(height: 4),
-          Text('Etapa ${widget.form.stageId}',
-              style: const TextStyle(color: AppColors.muted)),
+          Text(
+            'Etapa ${widget.form.stageId}',
+            style: const TextStyle(color: AppColors.muted),
+          ),
           const SizedBox(height: 14),
           for (final entry in values.entries)
             Padding(
@@ -3007,7 +3107,8 @@ class _FormCaptureSheetState extends State<FormCaptureSheet> {
             child: FilledButton.icon(
               onPressed: () {
                 widget.onSave(
-                    values.map((key, value) => MapEntry(key, value.text)));
+                  values.map((key, value) => MapEntry(key, value.text)),
+                );
               },
               icon: const Icon(Icons.save_outlined),
               label: const Text('Guardar captura'),
@@ -3061,9 +3162,11 @@ class _OpportunityEditorSheetState extends State<OpportunityEditorSheet> {
     company = TextEditingController(text: opportunity?.company ?? '');
     product = TextEditingController(text: opportunity?.product ?? '');
     amount = TextEditingController(
-        text: opportunity == null ? '' : opportunity.amount.toStringAsFixed(0));
+      text: opportunity == null ? '' : opportunity.amount.toStringAsFixed(0),
+    );
     closePercent = TextEditingController(
-        text: opportunity == null ? '10' : '${opportunity.closePercent}');
+      text: opportunity == null ? '10' : '${opportunity.closePercent}',
+    );
     strategy = TextEditingController(text: opportunity?.strategy ?? '');
     phone = TextEditingController(text: opportunity?.phone ?? '');
     responsible = TextEditingController(text: opportunity?.responsible ?? '');
@@ -3096,8 +3199,10 @@ class _OpportunityEditorSheetState extends State<OpportunityEditorSheet> {
         children: [
           Row(
             children: [
-              const Icon(Icons.business_center_outlined,
-                  color: AppColors.green),
+              const Icon(
+                Icons.business_center_outlined,
+                color: AppColors.green,
+              ),
               const SizedBox(width: 10),
               Expanded(
                 child: Text(
@@ -3105,7 +3210,9 @@ class _OpportunityEditorSheetState extends State<OpportunityEditorSheet> {
                       ? 'Nueva oportunidad'
                       : 'Editar oportunidad',
                   style: const TextStyle(
-                      fontSize: 22, fontWeight: FontWeight.w900),
+                    fontSize: 22,
+                    fontWeight: FontWeight.w900,
+                  ),
                 ),
               ),
             ],
@@ -3152,8 +3259,9 @@ class _OpportunityEditorSheetState extends State<OpportunityEditorSheet> {
                 child: TextField(
                   controller: amount,
                   keyboardType: TextInputType.number,
-                  decoration:
-                      const InputDecoration(labelText: 'Venta probable'),
+                  decoration: const InputDecoration(
+                    labelText: 'Venta probable',
+                  ),
                 ),
               ),
               const SizedBox(width: 10),
@@ -3192,7 +3300,9 @@ class _OpportunityEditorSheetState extends State<OpportunityEditorSheet> {
                   items: const [
                     DropdownMenuItem(value: 'Vigente', child: Text('Vigente')),
                     DropdownMenuItem(
-                        value: 'En negociacion', child: Text('En negociacion')),
+                      value: 'En negociacion',
+                      child: Text('En negociacion'),
+                    ),
                     DropdownMenuItem(value: 'Ganada', child: Text('Ganada')),
                     DropdownMenuItem(value: 'Perdida', child: Text('Perdida')),
                     DropdownMenuItem(value: 'Pausada', child: Text('Pausada')),
@@ -3492,11 +3602,7 @@ class GlassCard extends StatelessWidget {
 }
 
 class SectionTitle extends StatelessWidget {
-  const SectionTitle({
-    required this.eyebrow,
-    required this.title,
-    super.key,
-  });
+  const SectionTitle({required this.eyebrow, required this.title, super.key});
 
   final String eyebrow;
   final String title;
@@ -3515,8 +3621,10 @@ class SectionTitle extends StatelessWidget {
           ),
         ),
         const SizedBox(height: 3),
-        Text(title,
-            style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w900)),
+        Text(
+          title,
+          style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w900),
+        ),
       ],
     );
   }
@@ -3545,19 +3653,18 @@ class StatusChip extends StatelessWidget {
       ),
       child: Text(
         status.label,
-        style:
-            TextStyle(color: color, fontSize: 12, fontWeight: FontWeight.w900),
+        style: TextStyle(
+          color: color,
+          fontSize: 12,
+          fontWeight: FontWeight.w900,
+        ),
       ),
     );
   }
 }
 
 class StageProgress extends StatelessWidget {
-  const StageProgress({
-    required this.stageId,
-    this.max = 8,
-    super.key,
-  });
+  const StageProgress({required this.stageId, this.max = 8, super.key});
 
   final int stageId;
   final int max;
@@ -3593,7 +3700,10 @@ class CountPill extends StatelessWidget {
       child: Text(
         value,
         style: const TextStyle(
-            color: AppColors.green, fontWeight: FontWeight.w900, fontSize: 12),
+          color: AppColors.green,
+          fontWeight: FontWeight.w900,
+          fontSize: 12,
+        ),
       ),
     );
   }
@@ -3613,18 +3723,16 @@ class Tag extends StatelessWidget {
         borderRadius: BorderRadius.circular(12),
         border: Border.all(color: AppColors.green.withValues(alpha: 0.12)),
       ),
-      child: Text(text,
-          style: const TextStyle(color: AppColors.ink, fontSize: 12)),
+      child: Text(
+        text,
+        style: const TextStyle(color: AppColors.ink, fontSize: 12),
+      ),
     );
   }
 }
 
 class DetailTile extends StatelessWidget {
-  const DetailTile({
-    required this.label,
-    required this.value,
-    super.key,
-  });
+  const DetailTile({required this.label, required this.value, super.key});
 
   final String label;
   final String value;
@@ -3643,8 +3751,10 @@ class DetailTile extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(label,
-              style: const TextStyle(color: AppColors.muted, fontSize: 12)),
+          Text(
+            label,
+            style: const TextStyle(color: AppColors.muted, fontSize: 12),
+          ),
           const SizedBox(height: 3),
           Text(value, style: const TextStyle(fontWeight: FontWeight.w800)),
         ],
@@ -3667,31 +3777,40 @@ class EmptyBlock extends StatelessWidget {
         border: Border.all(color: AppColors.line),
         borderRadius: BorderRadius.circular(14),
       ),
-      child: Text(text,
-          textAlign: TextAlign.center,
-          style: const TextStyle(color: AppColors.muted)),
+      child: Text(
+        text,
+        textAlign: TextAlign.center,
+        style: const TextStyle(color: AppColors.muted),
+      ),
     );
   }
 }
 
 class KonfiApiClient {
-  const KonfiApiClient(this.baseUrl);
+  const KonfiApiClient(this.baseUrl, {this.pathPrefix = apiPathPrefix});
 
   final String baseUrl;
+  final String pathPrefix;
 
-  Uri _uri(String path) => Uri.parse('$baseUrl$path');
+  Uri _uri(String path) {
+    final cleanBase = baseUrl.endsWith('/')
+        ? baseUrl.substring(0, baseUrl.length - 1)
+        : baseUrl;
+    final cleanPrefix = pathPrefix.startsWith('/')
+        ? pathPrefix
+        : '/$pathPrefix';
+    final cleanPath = path.startsWith('/') ? path : '/$path';
+    return Uri.parse('$cleanBase$cleanPrefix$cleanPath');
+  }
 
   Future<SalesStore> loadStore({SalesStore? previous}) async {
-    final response = await http.get(_uri('/api/bootstrap'));
+    final response = await http.get(_uri('/bootstrap'));
     return _decodeStore(response, previous: previous);
   }
 
-  Future<SalesStore> login(
-    LoginDraft draft, {
-    SalesStore? previous,
-  }) async {
+  Future<SalesStore> login(LoginDraft draft, {SalesStore? previous}) async {
     final response = await http.post(
-      _uri('/api/auth/login'),
+      _uri('/auth/login'),
       headers: const {'Content-Type': 'application/json'},
       body: jsonEncode({
         'username': draft.username,
@@ -3707,7 +3826,7 @@ class KonfiApiClient {
     SalesStore? previous,
   }) async {
     final response = await http.patch(
-      _uri('/api/agenda/$agendaId'),
+      _uri('/agenda/$agendaId'),
       headers: const {'Content-Type': 'application/json'},
       body: jsonEncode({'status': status.label}),
     );
@@ -3725,7 +3844,7 @@ class KonfiApiClient {
     final time =
         '${now.hour.toString().padLeft(2, '0')}:${now.minute.toString().padLeft(2, '0')}';
     final response = await http.post(
-      _uri('/api/gestiones'),
+      _uri('/gestiones'),
       headers: const {'Content-Type': 'application/json'},
       body: jsonEncode({
         'opportunityId': opportunityId,
@@ -3751,7 +3870,7 @@ class KonfiApiClient {
     SalesStore? previous,
   }) async {
     final response = await http.post(
-      _uri('/api/gestiones'),
+      _uri('/gestiones'),
       headers: const {'Content-Type': 'application/json'},
       body: jsonEncode({
         'opportunityId': draft.opportunityId,
@@ -3791,8 +3910,9 @@ class KonfiApiClient {
       'status': draft.status,
       'responsible': draft.responsible,
       'ownerId': ownerId,
-      'nextAction':
-          draft.strategy.isEmpty ? 'Seguimiento comercial' : draft.strategy,
+      'nextAction': draft.strategy.isEmpty
+          ? 'Seguimiento comercial'
+          : draft.strategy,
       'nextDate': nextDate,
       'lastNote': draft.comment,
       'comment': draft.comment,
@@ -3810,7 +3930,7 @@ class KonfiApiClient {
     SalesStore? previous,
   }) async {
     final response = await http.post(
-      _uri('/api/opportunities'),
+      _uri('/opportunities'),
       headers: const {'Content-Type': 'application/json'},
       body: jsonEncode(_opportunityPayload(draft, ownerId)),
     );
@@ -3824,7 +3944,7 @@ class KonfiApiClient {
     SalesStore? previous,
   }) async {
     final response = await http.patch(
-      _uri('/api/opportunities/$opportunityId'),
+      _uri('/opportunities/$opportunityId'),
       headers: const {'Content-Type': 'application/json'},
       body: jsonEncode(_opportunityPayload(draft, ownerId)),
     );
@@ -3835,8 +3955,7 @@ class KonfiApiClient {
     String opportunityId, {
     SalesStore? previous,
   }) async {
-    final response =
-        await http.delete(_uri('/api/opportunities/$opportunityId'));
+    final response = await http.delete(_uri('/opportunities/$opportunityId'));
     return _decodeStore(response, previous: previous);
   }
 
@@ -3845,7 +3964,7 @@ class KonfiApiClient {
     SalesStore? previous,
   }) async {
     final response = await http.post(
-      _uri('/api/users'),
+      _uri('/users'),
       headers: const {'Content-Type': 'application/json'},
       body: jsonEncode({
         'firstName': draft.firstName,
@@ -3870,7 +3989,7 @@ class KonfiApiClient {
     SalesStore? previous,
   }) async {
     final response = await http.patch(
-      _uri('/api/users/$sellerId'),
+      _uri('/users/$sellerId'),
       headers: const {'Content-Type': 'application/json'},
       body: jsonEncode({
         'firstName': draft.firstName,
@@ -3893,7 +4012,7 @@ class KonfiApiClient {
     String sellerId, {
     SalesStore? previous,
   }) async {
-    final response = await http.delete(_uri('/api/users/$sellerId'));
+    final response = await http.delete(_uri('/users/$sellerId'));
     return _decodeStore(response, previous: previous);
   }
 
@@ -3937,8 +4056,8 @@ class SalesStore {
     required this.forms,
     Map<String, List<Map<String, String>>>? formResponses,
     List<VisitResult>? visitResults,
-  })  : formResponses = formResponses ?? {},
-        visitResults = visitResults ?? [];
+  }) : formResponses = formResponses ?? {},
+       visitResults = visitResults ?? [];
 
   final SalesUser currentSeller;
   final List<SalesUser> sellers;
@@ -3951,8 +4070,11 @@ class SalesStore {
 
   static SalesStore seed() {
     return SalesStore(
-      currentSeller:
-          const SalesUser(id: 'u2', name: 'Carlos Rivera', initials: 'CR'),
+      currentSeller: const SalesUser(
+        id: 'u2',
+        name: 'Carlos Rivera',
+        initials: 'CR',
+      ),
       sellers: const [
         SalesUser(
           id: 'u2',
@@ -3976,13 +4098,25 @@ class SalesStore {
       stages: const [
         SalesStage(1, 'Prospeccion', 'Calificar potencial real y segmento.'),
         SalesStage(
-            2, 'Contacto inicial', 'Abrir relacion y coordinar reunion.'),
-        SalesStage(3, 'Deteccion de necesidades',
-            'Levantar informacion con SPIN/BANT.'),
+          2,
+          'Contacto inicial',
+          'Abrir relacion y coordinar reunion.',
+        ),
         SalesStage(
-            4, 'Presentacion de solucion', 'Presentar propuesta y muestras.'),
+          3,
+          'Deteccion de necesidades',
+          'Levantar informacion con SPIN/BANT.',
+        ),
         SalesStage(
-            5, 'Objeciones', 'Resolver dudas de precio, tiempo y calidad.'),
+          4,
+          'Presentacion de solucion',
+          'Presentar propuesta y muestras.',
+        ),
+        SalesStage(
+          5,
+          'Objeciones',
+          'Resolver dudas de precio, tiempo y calidad.',
+        ),
         SalesStage(6, 'Cierre', 'Formalizar condiciones y anticipo.'),
         SalesStage(7, 'Compilado', 'Entregar informacion a produccion.'),
         SalesStage(8, 'Postventa', 'Medir satisfaccion, NPS y recompra.'),
@@ -4100,14 +4234,14 @@ class SalesStore {
           'Contacto',
           'Telefono',
           'Necesidad',
-          'Monto estimado'
+          'Monto estimado',
         ]),
         StageForm(2, 'Solicitud de muestras', [
           'Cantidad',
           'Tipo de prenda',
           'Tela',
           'Referencia',
-          'Fecha requerida'
+          'Fecha requerida',
         ]),
         StageForm(3, 'SPIN/BANT', [
           'Situacion',
@@ -4115,26 +4249,36 @@ class SalesStore {
           'Impacto',
           'Necesidad',
           'Presupuesto',
-          'Autoridad'
+          'Autoridad',
         ]),
         StageForm(4, 'Presentacion de solucion', [
           'Propuesta',
           'Muestras',
           'Beneficios',
           'Condiciones',
-          'Siguiente paso'
+          'Siguiente paso',
         ]),
-        StageForm(5, 'Registro de objeciones',
-            ['Objecion', 'Causa', 'Respuesta', 'Evidencia', 'Estado']),
+        StageForm(5, 'Registro de objeciones', [
+          'Objecion',
+          'Causa',
+          'Respuesta',
+          'Evidencia',
+          'Estado',
+        ]),
         StageForm(6, 'Cierre de ventas', [
           'Condiciones',
           'Anticipo',
           'Orden compra',
           'Tallas',
-          'Fecha entrega'
+          'Fecha entrega',
         ]),
-        StageForm(8, 'Encuesta postventa',
-            ['Satisfaccion', 'NPS', 'Incidencias', 'Referidos', 'Recompra']),
+        StageForm(8, 'Encuesta postventa', [
+          'Satisfaccion',
+          'NPS',
+          'Incidencias',
+          'Referidos',
+          'Recompra',
+        ]),
       ],
     );
   }
@@ -4143,21 +4287,21 @@ class SalesStore {
     Map<String, dynamic> json, {
     SalesStore? previous,
   }) {
-    final users = _list(json['users'])
-        .map((item) => SalesUser.fromJson(_map(item)))
-        .toList();
-    final stages = _list(json['stages'])
-        .map((item) => SalesStage.fromJson(_map(item)))
-        .toList();
-    final opportunities = _list(json['opportunities'])
-        .map((item) => Opportunity.fromJson(_map(item), stages))
-        .toList();
-    final agenda = _list(json['agenda'])
-        .map((item) => AgendaItem.fromJson(_map(item)))
-        .toList();
-    final forms = _list(json['forms'])
-        .map((item) => StageForm.fromJson(_map(item)))
-        .toList();
+    final users = _list(
+      json['users'],
+    ).map((item) => SalesUser.fromJson(_map(item))).toList();
+    final stages = _list(
+      json['stages'],
+    ).map((item) => SalesStage.fromJson(_map(item))).toList();
+    final opportunities = _list(
+      json['opportunities'],
+    ).map((item) => Opportunity.fromJson(_map(item), stages)).toList();
+    final agenda = _list(
+      json['agenda'],
+    ).map((item) => AgendaItem.fromJson(_map(item))).toList();
+    final forms = _list(
+      json['forms'],
+    ).map((item) => StageForm.fromJson(_map(item))).toList();
 
     SalesUser pickSeller() {
       final activeUserId = _text(json['activeUserId']);
@@ -4222,8 +4366,9 @@ class SalesStore {
   SalesStore withUpdatedSeller(SalesUser seller) {
     return SalesStore(
       currentSeller: seller,
-      sellers:
-          sellers.map((item) => item.id == seller.id ? seller : item).toList(),
+      sellers: sellers
+          .map((item) => item.id == seller.id ? seller : item)
+          .toList(),
       stages: stages,
       opportunities: opportunities,
       agenda: agenda,
@@ -4253,11 +4398,17 @@ class SalesStore {
   List<Opportunity> get myOpportunities =>
       opportunities.where((item) => item.ownerId == currentSeller.id).toList();
 
-  List<Opportunity> get myActiveOpportunities => myOpportunities
-      .where((item) => !{'ganada', 'perdida', 'cancelada'}
-          .contains(item.status.toLowerCase()))
-      .toList()
-    ..sort((a, b) => a.deadline.compareTo(b.deadline));
+  List<Opportunity> get myActiveOpportunities =>
+      myOpportunities
+          .where(
+            (item) => !{
+              'ganada',
+              'perdida',
+              'cancelada',
+            }.contains(item.status.toLowerCase()),
+          )
+          .toList()
+        ..sort((a, b) => a.deadline.compareTo(b.deadline));
 
   List<AgendaItem> get myAgenda =>
       agenda.where((item) => item.ownerId == currentSeller.id).toList();
@@ -4275,8 +4426,10 @@ class SalesStore {
       formResponses.values.fold<int>(0, (sum, item) => sum + item.length);
 
   String get pipelineLabel {
-    final total =
-        myOpportunities.fold<double>(0, (sum, item) => sum + item.amount);
+    final total = myOpportunities.fold<double>(
+      0,
+      (sum, item) => sum + item.amount,
+    );
     if (total >= 1000) return '\$${(total / 1000).toStringAsFixed(1)}k';
     return '\$${total.toStringAsFixed(0)}';
   }
@@ -4341,10 +4494,7 @@ class SalesStore {
     formResponses.putIfAbsent(formId, () => []).add(values);
   }
 
-  void saveOpportunityDraft(
-    OpportunityDraft draft, {
-    String? opportunityId,
-  }) {
+  void saveOpportunityDraft(OpportunityDraft draft, {String? opportunityId}) {
     final id = opportunityId ?? 'opp-${DateTime.now().millisecondsSinceEpoch}';
     final stage = stages.firstWhere(
       (item) => item.id == draft.stageId,
@@ -4370,8 +4520,9 @@ class SalesStore {
       status: draft.status,
       responsible: draft.responsible,
       ownerId: currentSeller.id,
-      nextAction:
-          draft.strategy.isEmpty ? 'Seguimiento comercial' : draft.strategy,
+      nextAction: draft.strategy.isEmpty
+          ? 'Seguimiento comercial'
+          : draft.strategy,
       note: draft.comment,
       comment: draft.comment,
     );
@@ -4447,8 +4598,9 @@ class SalesUser {
       firstName: parsedFirstName.isEmpty
           ? _firstNameFromFullName(name)
           : parsedFirstName,
-      lastName:
-          parsedLastName.isEmpty ? _lastNameFromFullName(name) : parsedLastName,
+      lastName: parsedLastName.isEmpty
+          ? _lastNameFromFullName(name)
+          : parsedLastName,
       dui: _text(json['dui']),
       address: _text(json['address']),
       roleId: _text(json['roleId'], 'sales_exec'),
@@ -4478,8 +4630,9 @@ class SalesUser {
     return SalesUser(
       id: id,
       name: draft.fullName.isEmpty ? name : draft.fullName,
-      initials:
-          initialsFromName(draft.fullName.isEmpty ? name : draft.fullName),
+      initials: initialsFromName(
+        draft.fullName.isEmpty ? name : draft.fullName,
+      ),
       firstName: draft.firstName,
       lastName: draft.lastName,
       dui: draft.dui,
@@ -4795,10 +4948,7 @@ class SellerDraft {
 }
 
 class LoginDraft {
-  const LoginDraft({
-    required this.username,
-    required this.password,
-  });
+  const LoginDraft({required this.username, required this.password});
 
   final String username;
   final String password;

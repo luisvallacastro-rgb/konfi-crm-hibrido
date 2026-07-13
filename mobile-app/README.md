@@ -1,17 +1,32 @@
-# konfi_sales_app
+# KONFI CRM Mobile
 
-A new Flutter project.
+App Flutter para vendedores conectada al CRM.
 
-## Getting Started
+## Backend
 
-This project is a starting point for a Flutter application.
+Por defecto la app usa:
 
-A few resources to get you started if this is your first Flutter project:
+- `API_BASE_URL`: `http://127.0.0.1:8099`
+- `API_PATH_PREFIX`: `/api/crm`
 
-- [Learn Flutter](https://docs.flutter.dev/get-started/learn-flutter)
-- [Write your first Flutter app](https://docs.flutter.dev/get-started/codelab)
-- [Flutter learning resources](https://docs.flutter.dev/reference/learning-resources)
+Para el Sistema Gerencial publicado:
 
-For help getting started with Flutter development, view the
-[online documentation](https://docs.flutter.dev/), which offers tutorials,
-samples, guidance on mobile development, and a full API reference.
+```bash
+flutter build apk --debug \
+  --dart-define=API_BASE_URL=https://sistema-gerencial.onrender.com \
+  --dart-define=API_PATH_PREFIX=/api/crm
+```
+
+Para el CRM antiguo:
+
+```bash
+flutter build apk --debug \
+  --dart-define=API_BASE_URL=https://induccion-gerencia-comercial.onrender.com \
+  --dart-define=API_PATH_PREFIX=/api
+```
+
+En Windows, desde la carpeta raiz del proyecto:
+
+```bat
+build-flutter-apk.bat https://sistema-gerencial.onrender.com /api/crm
+```
