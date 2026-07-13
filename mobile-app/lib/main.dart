@@ -1513,7 +1513,7 @@ class InitialsAvatar extends StatelessWidget {
   }
 }
 
-class OpportunitiesPage extends StatelessWidget {
+class OpportunitiesPage extends StatefulWidget {
   const OpportunitiesPage({
     required this.store,
     required this.onNewOpportunity,
@@ -1530,63 +1530,137 @@ class OpportunitiesPage extends StatelessWidget {
   final Future<void> Function() onSync;
 
   @override
+  State<OpportunitiesPage> createState() => _OpportunitiesPageState();
+}
+
+class _OpportunitiesPageState extends State<OpportunitiesPage> {
+  int? selectedStageId;
+
+  @override
   Widget build(BuildContext context) {
-    final opportunities = store.myActiveOpportunities;
+    final opportunities = widget.store.myActiveOpportunities;
+    final stages = [...widget.store.stages]
+      ..sort((a, b) => a.id.compareTo(b.id));
+    final total = opportunities.fold<double>(
+      0,
+      (sum, opportunity) => sum + opportunity.amount,
+    );
+    final visibleOpportunities = opportunities
+        .where(
+          (opportunity) =>
+              selectedStageId == null || opportunity.stageId == selectedStageId,
+        )
+        .toList()
+      ..sort((a, b) {
+        final stageOrder = a.stageId.compareTo(b.stageId);
+        return stageOrder != 0 ? stageOrder : a.deadline.compareTo(b.deadline);
+      });
+    SalesStage? selectedStage;
+    for (final stage in stages) {
+      if (stage.id == selectedStageId) selectedStage = stage;
+    }
+
     return RefreshIndicator(
-      onRefresh: onSync,
+      onRefresh: widget.onSync,
       child: ListView(
         padding: const EdgeInsets.fromLTRB(16, 8, 16, 112),
         children: [
-          GlassCard(
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-            child: Row(
-              children: [
-                IconButton.filledTonal(
-                  tooltip: 'Cartera asignada',
-                  visualDensity: VisualDensity.compact,
-                  onPressed: () => showCrmAssignmentNotifications(
-                    context,
-                    store,
-                    opportunities,
-                  ),
-                  icon: const Icon(Icons.notifications_active_outlined),
-                ),
-                const Spacer(),
-                IconButton.outlined(
-                  tooltip: 'Sincronizar CRM',
-                  visualDensity: VisualDensity.compact,
-                  onPressed: () => unawaited(onSync()),
-                  icon: const Icon(Icons.sync),
-                ),
-                IconButton.filled(
-                  tooltip: 'Nueva oportunidad',
-                  visualDensity: VisualDensity.compact,
-                  onPressed: onNewOpportunity,
-                  icon: const Icon(Icons.add),
-                ),
-              ],
+          ActivePipelineHero(
+            amount: total,
+            opportunityCount: opportunities.length,
+            onNotifications: () => showCrmAssignmentNotifications(
+              context,
+              widget.store,
+              opportunities,
+            ),
+            onSync: () => unawaited(widget.onSync()),
+            onNewOpportunity: widget.onNewOpportunity,
+          ),
+          const SizedBox(height: 18),
+          const Text(
+            'ETAPAS DE VENTA',
+            style: TextStyle(
+              color: AppColors.green,
+              fontSize: 12,
+              fontWeight: FontWeight.w900,
+              letterSpacing: 1.1,
             ),
           ),
-          const SizedBox(height: 14),
-          const SectionTitle(
-            eyebrow: 'Pipeline activo',
-            title: 'Mis oportunidades vigentes',
+          const SizedBox(height: 4),
+          const Text(
+            'Explora tu pipeline',
+            style: TextStyle(fontSize: 20, fontWeight: FontWeight.w900),
           ),
-          const SizedBox(height: 10),
-          if (opportunities.isEmpty)
+          const SizedBox(height: 12),
+          SizedBox(
+            height: 132,
+            child: ListView.separated(
+              scrollDirection: Axis.horizontal,
+              itemCount: stages.length + 1,
+              separatorBuilder: (_, __) => const SizedBox(width: 10),
+              itemBuilder: (context, index) {
+                final stage = index == 0 ? null : stages[index - 1];
+                final stageOpportunities = stage == null
+                    ? opportunities
+                    : opportunities
+                        .where((item) => item.stageId == stage.id)
+                        .toList();
+                final stageTotal = stageOpportunities.fold<double>(
+                  0,
+                  (sum, opportunity) => sum + opportunity.amount,
+                );
+                return PipelineStageCarouselCard(
+                  stageNumber: stage?.id,
+                  title: stage?.name ?? 'Todas',
+                  count: stageOpportunities.length,
+                  amount: stageTotal,
+                  selected: selectedStageId == stage?.id,
+                  onTap: () => setState(() => selectedStageId = stage?.id),
+                );
+              },
+            ),
+          ),
+          const SizedBox(height: 20),
+          Row(
+            children: [
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      selectedStage?.name ?? 'Todas las oportunidades',
+                      style: const TextStyle(
+                        fontSize: 19,
+                        fontWeight: FontWeight.w900,
+                      ),
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      '${visibleOpportunities.length} en esta vista',
+                      style: const TextStyle(color: AppColors.muted),
+                    ),
+                  ],
+                ),
+              ),
+              CountPill(value: '${visibleOpportunities.length}'),
+            ],
+          ),
+          const SizedBox(height: 12),
+          if (visibleOpportunities.isEmpty)
             GlassCard(
               padding: const EdgeInsets.all(16),
               child: Column(
                 children: [
-                  const EmptyBlock(
-                    text:
-                        'Aun no tienes oportunidades vigentes asignadas desde CRM.',
+                  EmptyBlock(
+                    text: selectedStage == null
+                        ? 'Aun no tienes oportunidades vigentes asignadas desde CRM.'
+                        : 'No hay oportunidades activas en ${selectedStage.name}.',
                   ),
                   const SizedBox(height: 12),
                   SizedBox(
                     width: double.infinity,
                     child: OutlinedButton.icon(
-                      onPressed: () => unawaited(onSync()),
+                      onPressed: () => unawaited(widget.onSync()),
                       icon: const Icon(Icons.sync),
                       label: const Text('Sincronizar asignaciones CRM'),
                     ),
@@ -1595,7 +1669,7 @@ class OpportunitiesPage extends StatelessWidget {
                   SizedBox(
                     width: double.infinity,
                     child: FilledButton.icon(
-                      onPressed: onNewOpportunity,
+                      onPressed: widget.onNewOpportunity,
                       icon: const Icon(Icons.add_business_outlined),
                       label: const Text('Crear primera oportunidad'),
                     ),
@@ -1604,11 +1678,11 @@ class OpportunitiesPage extends StatelessWidget {
               ),
             )
           else
-            for (final opportunity in opportunities)
+            for (final opportunity in visibleOpportunities)
               OpportunityListCard(
                 opportunity: opportunity,
-                onTap: () => onOpenOpportunity(opportunity.id),
-                onEdit: () => onEditOpportunity(opportunity),
+                onTap: () => widget.onOpenOpportunity(opportunity.id),
+                onEdit: () => widget.onEditOpportunity(opportunity),
               ),
         ],
       ),
@@ -1684,6 +1758,247 @@ class OpportunitiesPage extends StatelessWidget {
                 style: const TextStyle(color: AppColors.muted),
               ),
           ],
+        ),
+      ),
+    );
+  }
+}
+
+class ActivePipelineHero extends StatelessWidget {
+  const ActivePipelineHero({
+    required this.amount,
+    required this.opportunityCount,
+    required this.onNotifications,
+    required this.onSync,
+    required this.onNewOpportunity,
+    super.key,
+  });
+
+  final double amount;
+  final int opportunityCount;
+  final VoidCallback onNotifications;
+  final VoidCallback onSync;
+  final VoidCallback onNewOpportunity;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.fromLTRB(18, 18, 14, 14),
+      decoration: BoxDecoration(
+        gradient: const LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [Color(0xFF244557), Color(0xFF17233A)],
+        ),
+        borderRadius: BorderRadius.circular(26),
+        border: Border.all(color: AppColors.green.withValues(alpha: .25)),
+        boxShadow: [
+          BoxShadow(
+            color: AppColors.green.withValues(alpha: .08),
+            blurRadius: 28,
+            offset: const Offset(0, 14),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Container(
+                width: 36,
+                height: 36,
+                decoration: BoxDecoration(
+                  color: AppColors.green.withValues(alpha: .14),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: const Icon(
+                  Icons.trending_up_rounded,
+                  color: AppColors.green,
+                  size: 21,
+                ),
+              ),
+              const SizedBox(width: 10),
+              const Expanded(
+                child: Text(
+                  'OPORTUNIDADES ACTIVAS',
+                  style: TextStyle(
+                    color: AppColors.green,
+                    fontSize: 11,
+                    fontWeight: FontWeight.w900,
+                    letterSpacing: 1.1,
+                  ),
+                ),
+              ),
+              IconButton(
+                tooltip: 'Sincronizar CRM',
+                visualDensity: VisualDensity.compact,
+                onPressed: onSync,
+                icon: const Icon(Icons.sync_rounded, size: 21),
+              ),
+            ],
+          ),
+          const SizedBox(height: 14),
+          Text(
+            _currency(amount),
+            style: const TextStyle(
+              color: AppColors.ink,
+              fontSize: 36,
+              height: 1,
+              fontWeight: FontWeight.w900,
+              letterSpacing: -1.4,
+            ),
+          ),
+          const SizedBox(height: 8),
+          Text(
+            '$opportunityCount oportunidades vigentes',
+            style: const TextStyle(
+              color: AppColors.muted,
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+          const SizedBox(height: 16),
+          Row(
+            children: [
+              Expanded(
+                child: OutlinedButton.icon(
+                  onPressed: onNotifications,
+                  icon: const Icon(Icons.notifications_none_rounded, size: 19),
+                  label: const Text('Asignaciones'),
+                ),
+              ),
+              const SizedBox(width: 10),
+              FilledButton.icon(
+                onPressed: onNewOpportunity,
+                icon: const Icon(Icons.add_rounded, size: 20),
+                label: const Text('Nueva'),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class PipelineStageCarouselCard extends StatelessWidget {
+  const PipelineStageCarouselCard({
+    required this.stageNumber,
+    required this.title,
+    required this.count,
+    required this.amount,
+    required this.selected,
+    required this.onTap,
+    super.key,
+  });
+
+  final int? stageNumber;
+  final String title;
+  final int count;
+  final double amount;
+  final bool selected;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return Semantics(
+      button: true,
+      selected: selected,
+      label: '$title, $count oportunidades, ${_currency(amount)}',
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(22),
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 240),
+          curve: Curves.easeOutCubic,
+          width: 164,
+          padding: const EdgeInsets.all(14),
+          decoration: BoxDecoration(
+            gradient: selected
+                ? const LinearGradient(
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                    colors: [AppColors.green, Color(0xFF5EDFC8)],
+                  )
+                : null,
+            color: selected ? null : AppColors.panel,
+            borderRadius: BorderRadius.circular(22),
+            border: Border.all(
+              color: selected ? AppColors.green : AppColors.line,
+            ),
+            boxShadow: selected
+                ? [
+                    BoxShadow(
+                      color: AppColors.green.withValues(alpha: .18),
+                      blurRadius: 22,
+                      offset: const Offset(0, 10),
+                    ),
+                  ]
+                : null,
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  Text(
+                    stageNumber == null ? 'PIPELINE' : 'ETAPA ${stageNumber!}',
+                    style: TextStyle(
+                      color: selected
+                          ? AppColors.page.withValues(alpha: .7)
+                          : AppColors.muted,
+                      fontSize: 10,
+                      fontWeight: FontWeight.w900,
+                      letterSpacing: .8,
+                    ),
+                  ),
+                  const Spacer(),
+                  Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 7,
+                      vertical: 3,
+                    ),
+                    decoration: BoxDecoration(
+                      color: selected
+                          ? AppColors.page.withValues(alpha: .12)
+                          : AppColors.green.withValues(alpha: .12),
+                      borderRadius: BorderRadius.circular(999),
+                    ),
+                    child: Text(
+                      '$count',
+                      style: TextStyle(
+                        color: selected ? AppColors.page : AppColors.green,
+                        fontSize: 11,
+                        fontWeight: FontWeight.w900,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 8),
+              Text(
+                title,
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(
+                  color: selected ? AppColors.page : AppColors.ink,
+                  fontSize: 14,
+                  height: 1.12,
+                  fontWeight: FontWeight.w900,
+                ),
+              ),
+              const Spacer(),
+              Text(
+                _currency(amount),
+                style: TextStyle(
+                  color: selected ? AppColors.page : AppColors.green,
+                  fontSize: 17,
+                  fontWeight: FontWeight.w900,
+                  letterSpacing: -.3,
+                ),
+              ),
+            ],
+          ),
         ),
       ),
     );
@@ -1768,6 +2083,7 @@ class OpportunityListCard extends StatelessWidget {
                 spacing: 8,
                 runSpacing: 8,
                 children: [
+                  InfoChip(text: opportunity.stageName),
                   InfoChip(text: opportunity.amountLabel),
                   InfoChip(text: '${opportunity.closePercent}% cierre'),
                   InfoChip(text: opportunity.status),
@@ -4135,6 +4451,17 @@ String _text(Object? value, [String fallback = '']) {
 double _money(Object? value) {
   if (value is num) return value.toDouble();
   return double.tryParse(value?.toString() ?? '') ?? 0;
+}
+
+String _currency(double value) {
+  final parts = value.toStringAsFixed(2).split('.');
+  final digits = parts.first;
+  final groups = <String>[];
+  for (var end = digits.length; end > 0; end -= 3) {
+    final start = math.max(0, end - 3);
+    groups.insert(0, digits.substring(start, end));
+  }
+  return '\$${groups.join(',')}.${parts.last}';
 }
 
 int _int(Object? value, [int fallback = 0]) {
