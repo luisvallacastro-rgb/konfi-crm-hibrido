@@ -367,14 +367,38 @@ class _SalesShellState extends State<SalesShell> {
         SnackBar(
           behavior: SnackBarBehavior.floating,
           backgroundColor: AppColors.surfaceStrong,
+          elevation: 12,
+          margin: const EdgeInsets.fromLTRB(18, 0, 18, 96),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(20),
+            side: const BorderSide(color: AppColors.green, width: 0.8),
+          ),
           content: Row(
             children: [
-              const Icon(
-                Icons.notifications_active_outlined,
-                color: AppColors.green,
+              Container(
+                width: 42,
+                height: 42,
+                decoration: BoxDecoration(
+                  color: AppColors.green.withValues(alpha: 0.12),
+                  borderRadius: BorderRadius.circular(14),
+                ),
+                child: const Icon(
+                  Icons.notifications_active_rounded,
+                  color: AppColors.green,
+                ),
               ),
-              const SizedBox(width: 10),
-              Expanded(child: Text(message)),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Text(
+                  message,
+                  style: const TextStyle(
+                    color: AppColors.ink,
+                    fontSize: 15,
+                    fontWeight: FontWeight.w600,
+                    height: 1.3,
+                  ),
+                ),
+              ),
             ],
           ),
           action: SnackBarAction(
