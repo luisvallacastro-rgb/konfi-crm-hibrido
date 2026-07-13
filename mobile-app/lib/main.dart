@@ -2020,91 +2020,155 @@ class OpportunityListCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Padding(
-      padding: const EdgeInsets.only(bottom: 12),
+      padding: const EdgeInsets.only(bottom: 10),
       child: GlassCard(
-        padding: const EdgeInsets.all(14),
+        padding: EdgeInsets.zero,
         child: InkWell(
           borderRadius: BorderRadius.circular(18),
           onTap: onTap,
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Container(
-                    width: 52,
-                    height: 52,
-                    decoration: BoxDecoration(
-                      color: AppColors.green.withValues(alpha: 0.13),
-                      borderRadius: BorderRadius.circular(14),
-                      border: Border.all(
-                        color: AppColors.green.withValues(alpha: 0.2),
-                      ),
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(12, 11, 8, 11),
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.center,
+              children: [
+                Container(
+                  width: 4,
+                  height: 68,
+                  decoration: BoxDecoration(
+                    gradient: const LinearGradient(
+                      begin: Alignment.topCenter,
+                      end: Alignment.bottomCenter,
+                      colors: [AppColors.green, AppColors.cyan],
                     ),
-                    child: const Icon(
-                      Icons.business_center_outlined,
-                      color: AppColors.green,
-                    ),
+                    borderRadius: BorderRadius.circular(999),
                   ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          opportunity.company,
-                          style: const TextStyle(
-                            fontSize: 17,
-                            fontWeight: FontWeight.w900,
+                ),
+                const SizedBox(width: 11),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Expanded(
+                            child: Text(
+                              opportunity.company,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: const TextStyle(
+                                fontSize: 16,
+                                fontWeight: FontWeight.w900,
+                              ),
+                            ),
                           ),
+                          const SizedBox(width: 8),
+                          Text(
+                            opportunity.amountLabel,
+                            style: const TextStyle(
+                              color: AppColors.green,
+                              fontSize: 16,
+                              fontWeight: FontWeight.w900,
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 3),
+                      Text(
+                        opportunity.product.isEmpty
+                            ? 'Producto pendiente'
+                            : opportunity.product,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(
+                          color: AppColors.muted,
+                          fontSize: 13,
                         ),
-                        const SizedBox(height: 3),
-                        Text(
-                          opportunity.product.isEmpty
-                              ? 'Producto pendiente'
-                              : opportunity.product,
-                          style: const TextStyle(color: AppColors.muted),
-                        ),
-                      ],
-                    ),
+                      ),
+                      const SizedBox(height: 9),
+                      Row(
+                        children: [
+                          Flexible(
+                            child: CompactOpportunityMeta(
+                              icon: Icons.route_outlined,
+                              text: opportunity.stageName,
+                              highlighted: true,
+                            ),
+                          ),
+                          const SizedBox(width: 7),
+                          CompactOpportunityMeta(
+                            icon: Icons.percent_rounded,
+                            text: '${opportunity.closePercent}',
+                          ),
+                          const SizedBox(width: 7),
+                          CompactOpportunityMeta(
+                            icon: Icons.event_outlined,
+                            text: opportunity.deadlineLabel,
+                          ),
+                        ],
+                      ),
+                    ],
                   ),
-                  IconButton(
-                    tooltip: 'Editar oportunidad',
-                    onPressed: onEdit,
-                    icon: const Icon(Icons.edit_outlined),
+                ),
+                IconButton(
+                  tooltip: 'Editar oportunidad',
+                  visualDensity: VisualDensity.compact,
+                  constraints: const BoxConstraints(
+                    minWidth: 34,
+                    minHeight: 34,
                   ),
-                ],
-              ),
-              const SizedBox(height: 12),
-              StageProgress(stageId: opportunity.stageId),
-              const SizedBox(height: 10),
-              Wrap(
-                spacing: 8,
-                runSpacing: 8,
-                children: [
-                  InfoChip(text: opportunity.stageName),
-                  InfoChip(text: opportunity.amountLabel),
-                  InfoChip(text: '${opportunity.closePercent}% cierre'),
-                  InfoChip(text: opportunity.status),
-                  InfoChip(text: 'Limite ${opportunity.deadlineLabel}'),
-                ],
-              ),
-              const SizedBox(height: 10),
-              Text(
-                '${opportunity.responsible} - ${opportunity.phone}',
-                style: const TextStyle(fontWeight: FontWeight.w700),
-              ),
-              if (opportunity.strategy.isNotEmpty) ...[
-                const SizedBox(height: 4),
-                Text(
-                  opportunity.strategy,
-                  style: const TextStyle(color: AppColors.muted),
+                  onPressed: onEdit,
+                  icon: const Icon(Icons.edit_outlined, size: 18),
                 ),
               ],
-            ],
+            ),
           ),
         ),
+      ),
+    );
+  }
+}
+
+class CompactOpportunityMeta extends StatelessWidget {
+  const CompactOpportunityMeta({
+    required this.icon,
+    required this.text,
+    this.highlighted = false,
+    super.key,
+  });
+
+  final IconData icon;
+  final String text;
+  final bool highlighted;
+
+  @override
+  Widget build(BuildContext context) {
+    final color = highlighted ? AppColors.green : AppColors.muted;
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 5),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: highlighted ? .1 : .06),
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(color: color.withValues(alpha: .16)),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, color: color, size: 13),
+          const SizedBox(width: 4),
+          Flexible(
+            child: Text(
+              text,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: TextStyle(
+                color: color,
+                fontSize: 11,
+                fontWeight: FontWeight.w800,
+              ),
+            ),
+          ),
+        ],
       ),
     );
   }
