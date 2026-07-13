@@ -75,6 +75,10 @@ class _SalesShellState extends State<SalesShell> {
   int tabIndex = 0;
   bool loading = true;
   String? offlineReason;
+  Timer? assignmentPoller;
+  bool assignmentBaselineReady = false;
+  final Set<String> knownAssignmentIds = {};
+  final Set<String> unreadAssignmentIds = {};
 
   SalesUser get seller =>
       registeredSeller ??
@@ -85,6 +89,12 @@ class _SalesShellState extends State<SalesShell> {
   void initState() {
     super.initState();
     unawaited(loadInitialSession());
+  }
+
+  @override
+  void dispose() {
+    assignmentPoller?.cancel();
+    super.dispose();
   }
 
   Future<void> loadInitialSession() async {
@@ -110,6 +120,7 @@ class _SalesShellState extends State<SalesShell> {
         loading = false;
         tabIndex = 0;
       });
+      _activateAssignmentMonitoring(loaded.withSeller(loggedSeller));
     } catch (_) {
       if (!mounted) return;
       await loadStore();
@@ -158,6 +169,8 @@ class _SalesShellState extends State<SalesShell> {
     final pages = [
       OpportunitiesPage(
         store: safeStore,
+        unreadOpportunityIds: unreadAssignmentIds,
+        onMarkAssignmentsRead: markAssignmentsRead,
         onNewOpportunity: () => openOpportunityEditorSheet(),
         onOpenOpportunity: openOpportunitySheet,
         onEditOpportunity: (opportunity) =>
@@ -218,13 +231,28 @@ class _SalesShellState extends State<SalesShell> {
     try {
       final loaded = await api.loadStore(previous: store);
       if (!mounted) return;
+      final nextStore = registeredSeller == null
+          ? loaded
+          : loaded.withSeller(registeredSeller!);
+      final newAssignments = assignmentBaselineReady
+          ? nextStore.myOpportunities
+              .where(
+                (item) =>
+                    !knownAssignmentIds.contains(item.id) &&
+                    item.source != 'App vendedor',
+              )
+              .toList()
+          : <Opportunity>[];
       setState(() {
-        store = registeredSeller == null
-            ? loaded
-            : loaded.withSeller(registeredSeller!);
+        store = nextStore;
+        knownAssignmentIds.addAll(
+          nextStore.myOpportunities.map((item) => item.id),
+        );
+        unreadAssignmentIds.addAll(newAssignments.map((item) => item.id));
         offlineReason = null;
         loading = false;
       });
+      if (newAssignments.isNotEmpty) _showAssignmentAlert(newAssignments);
     } catch (error) {
       if (!mounted) return;
       setState(() {
@@ -242,6 +270,7 @@ class _SalesShellState extends State<SalesShell> {
       store = activeStore.withSeller(seller);
       tabIndex = 0;
     });
+    _activateAssignmentMonitoring(activeStore.withSeller(seller));
   }
 
   Future<void> createSeller(SellerDraft draft) async {
@@ -256,6 +285,7 @@ class _SalesShellState extends State<SalesShell> {
         offlineReason = null;
         tabIndex = 0;
       });
+      _activateAssignmentMonitoring(loaded.withSeller(created));
     } catch (error) {
       final localSeller = SalesUser.localFromDraft(draft);
       if (!mounted) return;
@@ -266,6 +296,7 @@ class _SalesShellState extends State<SalesShell> {
             'Perfil creado localmente; pendiente de sincronizar con CRM.';
         tabIndex = 0;
       });
+      _activateAssignmentMonitoring(current.withSeller(localSeller));
     }
   }
 
@@ -281,6 +312,7 @@ class _SalesShellState extends State<SalesShell> {
         offlineReason = null;
         tabIndex = 0;
       });
+      _activateAssignmentMonitoring(loaded.withSeller(loggedSeller));
     } catch (error) {
       if (!mounted) return;
       final errorText = error.toString();
@@ -294,10 +326,64 @@ class _SalesShellState extends State<SalesShell> {
   }
 
   void switchSeller() {
+    assignmentPoller?.cancel();
+    assignmentPoller = null;
+    assignmentBaselineReady = false;
+    knownAssignmentIds.clear();
+    unreadAssignmentIds.clear();
     setState(() {
       registeredSeller = null;
       tabIndex = 0;
     });
+  }
+
+  void _activateAssignmentMonitoring(SalesStore activeStore) {
+    knownAssignmentIds
+      ..clear()
+      ..addAll(activeStore.myOpportunities.map((item) => item.id));
+    unreadAssignmentIds.clear();
+    assignmentBaselineReady = true;
+    assignmentPoller ??= Timer.periodic(
+      const Duration(seconds: 12),
+      (_) {
+        if (registeredSeller != null && !loading) unawaited(loadStore());
+      },
+    );
+  }
+
+  void markAssignmentsRead() {
+    if (unreadAssignmentIds.isEmpty) return;
+    setState(unreadAssignmentIds.clear);
+  }
+
+  void _showAssignmentAlert(List<Opportunity> assignments) {
+    final first = assignments.first;
+    final message = assignments.length == 1
+        ? 'Se te ha asignado una nueva oportunidad: ${first.company}'
+        : 'Se te asignaron ${assignments.length} oportunidades nuevas';
+    ScaffoldMessenger.of(context)
+      ..hideCurrentSnackBar()
+      ..showSnackBar(
+        SnackBar(
+          behavior: SnackBarBehavior.floating,
+          backgroundColor: AppColors.surfaceStrong,
+          content: Row(
+            children: [
+              const Icon(
+                Icons.notifications_active_outlined,
+                color: AppColors.green,
+              ),
+              const SizedBox(width: 10),
+              Expanded(child: Text(message)),
+            ],
+          ),
+          action: SnackBarAction(
+            label: 'Ver',
+            textColor: AppColors.green,
+            onPressed: () => setState(() => tabIndex = 0),
+          ),
+        ),
+      );
   }
 
   void openProfileSheet() {
@@ -1518,6 +1604,8 @@ class InitialsAvatar extends StatelessWidget {
 class OpportunitiesPage extends StatefulWidget {
   const OpportunitiesPage({
     required this.store,
+    required this.unreadOpportunityIds,
+    required this.onMarkAssignmentsRead,
     required this.onNewOpportunity,
     required this.onOpenOpportunity,
     required this.onEditOpportunity,
@@ -1526,6 +1614,8 @@ class OpportunitiesPage extends StatefulWidget {
   });
 
   final SalesStore store;
+  final Set<String> unreadOpportunityIds;
+  final VoidCallback onMarkAssignmentsRead;
   final VoidCallback onNewOpportunity;
   final ValueChanged<String> onOpenOpportunity;
   final ValueChanged<Opportunity> onEditOpportunity;
@@ -1570,6 +1660,7 @@ class _OpportunitiesPageState extends State<OpportunitiesPage> {
           ActivePipelineHero(
             amount: total,
             opportunityCount: opportunities.length,
+            unreadCount: widget.unreadOpportunityIds.length,
             onNotifications: () => showCrmAssignmentNotifications(
               context,
               widget.store,
@@ -1696,6 +1787,9 @@ class _OpportunitiesPageState extends State<OpportunitiesPage> {
     SalesStore store,
     List<Opportunity> opportunities,
   ) {
+    final notifications = opportunities
+        .where((item) => widget.unreadOpportunityIds.contains(item.id))
+        .toList();
     showModalBottomSheet<void>(
       context: context,
       backgroundColor: Colors.transparent,
@@ -1714,12 +1808,12 @@ class _OpportunitiesPageState extends State<OpportunitiesPage> {
               style: const TextStyle(color: AppColors.muted),
             ),
             const SizedBox(height: 14),
-            if (opportunities.isEmpty)
+            if (notifications.isEmpty)
               const EmptyBlock(
-                text: 'No hay oportunidades vigentes asignadas desde CRM.',
+                text: 'No hay nuevas oportunidades asignadas desde CRM.',
               )
             else
-              for (final opportunity in opportunities.take(6))
+              for (final opportunity in notifications.take(6))
                 Padding(
                   padding: const EdgeInsets.only(bottom: 8),
                   child: GlassCard(
@@ -1754,15 +1848,16 @@ class _OpportunitiesPageState extends State<OpportunitiesPage> {
                     ),
                   ),
                 ),
-            if (opportunities.length > 6)
+            if (notifications.length > 6)
               Text(
-                '+${opportunities.length - 6} oportunidades adicionales',
+                '+${notifications.length - 6} oportunidades adicionales',
                 style: const TextStyle(color: AppColors.muted),
               ),
           ],
         ),
       ),
     );
+    widget.onMarkAssignmentsRead();
   }
 }
 
@@ -1770,6 +1865,7 @@ class ActivePipelineHero extends StatelessWidget {
   const ActivePipelineHero({
     required this.amount,
     required this.opportunityCount,
+    required this.unreadCount,
     required this.onNotifications,
     required this.onSync,
     required this.onNewOpportunity,
@@ -1778,6 +1874,7 @@ class ActivePipelineHero extends StatelessWidget {
 
   final double amount;
   final int opportunityCount;
+  final int unreadCount;
   final VoidCallback onNotifications;
   final VoidCallback onSync;
   final VoidCallback onNewOpportunity;
@@ -1862,10 +1959,20 @@ class ActivePipelineHero extends StatelessWidget {
           const SizedBox(height: 16),
           Row(
             children: [
-              IconButton.outlined(
-                tooltip: 'Asignaciones CRM',
-                onPressed: onNotifications,
-                icon: const Icon(Icons.notifications_none_rounded, size: 21),
+              Badge.count(
+                count: unreadCount,
+                isLabelVisible: unreadCount > 0,
+                backgroundColor: AppColors.red,
+                child: IconButton.outlined(
+                  tooltip: 'Asignaciones CRM',
+                  onPressed: onNotifications,
+                  icon: Icon(
+                    unreadCount > 0
+                        ? Icons.notifications_active_rounded
+                        : Icons.notifications_none_rounded,
+                    size: 21,
+                  ),
+                ),
               ),
               const Spacer(),
               FilledButton.icon(
@@ -4673,6 +4780,7 @@ class KonfiApiClient {
       'status': draft.status,
       'responsible': draft.responsible,
       'ownerId': ownerId,
+      'source': 'App vendedor',
       'nextAction':
           draft.strategy.isEmpty ? 'Seguimiento comercial' : draft.strategy,
       'nextDate': nextDate,
@@ -5507,6 +5615,7 @@ class Opportunity {
     required this.nextAction,
     required this.note,
     required this.comment,
+    this.source = 'CRM',
   });
 
   final String id;
@@ -5531,6 +5640,7 @@ class Opportunity {
   final String nextAction;
   final String note;
   final String comment;
+  final String source;
 
   String get amountLabel {
     if (amount >= 1000) return '\$${amount.toStringAsFixed(0)}';
@@ -5575,6 +5685,7 @@ class Opportunity {
       nextAction: _text(json['nextAction'], 'Seguimiento pendiente'),
       note: _text(json['lastNote']),
       comment: _text(json['comment'], _text(json['lastNote'])),
+      source: _text(json['source'], 'CRM'),
     );
   }
 }
