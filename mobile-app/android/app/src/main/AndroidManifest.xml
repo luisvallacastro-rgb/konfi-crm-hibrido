@@ -1,6 +1,6 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
     <application
-        android:label="konfi_sales_app"
+        android:label="KMI Ventas"
         android:name="${applicationName}"
         android:icon="@mipmap/ic_launcher">
         <activity

@@ -24,7 +24,7 @@ class KonfiSalesApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      title: 'KONFI Ventas',
+      title: 'KMI Ventas',
       debugShowCheckedModeBanner: false,
       theme: ThemeData(
         useMaterial3: true,
@@ -45,17 +45,17 @@ class KonfiSalesApp extends StatelessWidget {
 }
 
 class AppColors {
-  static const page = Color(0xFF050D0D);
-  static const panel = Color(0xAA0D1F1E);
-  static const surface = Color(0xFF0D1F1E);
-  static const surfaceStrong = Color(0xFF132B29);
-  static const green = Color(0xFF45D6A6);
-  static const cyan = Color(0xFF51D7E8);
-  static const yellow = Color(0xFFF4C762);
-  static const red = Color(0xFFFF7777);
-  static const muted = Color(0xFF9BB3AB);
-  static const line = Color(0x24CBF4E8);
-  static const ink = Color(0xFFEEF8F5);
+  static const page = Color(0xFF111A2D);
+  static const panel = Color(0xCC17233A);
+  static const surface = Color(0xFF17233A);
+  static const surfaceStrong = Color(0xFF243452);
+  static const green = Color(0xFF72F5D1);
+  static const cyan = Color(0xFF68A8FF);
+  static const yellow = Color(0xFFF0AF4F);
+  static const red = Color(0xFFFF657E);
+  static const muted = Color(0xFF9FB0C7);
+  static const line = Color(0x336B82A6);
+  static const ink = Color(0xFFF4F8FF);
 }
 
 class SalesShell extends StatefulWidget {
@@ -748,9 +748,9 @@ class SellerRegistrationPage extends StatefulWidget {
 
 class _SellerRegistrationPageState extends State<SellerRegistrationPage> {
   final loginUserController = TextEditingController(
-    text: 'valladares@anlitikbi.com',
+    text: 'asesorayc@konfinversiones.com',
   );
-  final loginPasswordController = TextEditingController(text: '130688Kmila');
+  final loginPasswordController = TextEditingController();
   final firstNameController = TextEditingController();
   final lastNameController = TextEditingController();
   final duiController = TextEditingController();
@@ -759,9 +759,6 @@ class _SellerRegistrationPageState extends State<SellerRegistrationPage> {
   final emailController = TextEditingController();
   final passwordController = TextEditingController();
   final confirmPasswordController = TextEditingController();
-  SalesUser? selectedSeller;
-  bool registerMode = false;
-  bool showExisting = false;
   bool saving = false;
   bool showLoginPassword = false;
   bool showRegisterPassword = false;
@@ -787,39 +784,12 @@ class _SellerRegistrationPageState extends State<SellerRegistrationPage> {
     super.initState();
     firstNameController.addListener(() => setState(() {}));
     lastNameController.addListener(() => setState(() {}));
-    selectedSeller = availableSellers.isEmpty ? null : availableSellers.first;
-  }
-
-  List<SalesUser> get availableSellers {
-    final sellers = widget.store.sellers
-        .where((seller) => seller.roleId == 'sales_exec')
-        .toList();
-    return sellers.isEmpty ? [widget.store.currentSeller] : sellers;
   }
 
   @override
   Widget build(BuildContext context) {
-    final seller =
-        selectedSeller ??
-        (availableSellers.isEmpty
-            ? widget.store.currentSeller
-            : availableSellers.first);
-    final assignedAgenda = widget.store.agenda
-        .where((item) => item.ownerId == seller.id)
-        .length;
-    final assignedPipeline = widget.store.opportunities
-        .where((item) => item.ownerId == seller.id)
-        .fold<double>(0, (sum, item) => sum + item.amount);
-    final draftName =
-        '${firstNameController.text.trim()} ${lastNameController.text.trim()}'
-            .trim();
-    final registrationInitials = draftName.isEmpty
-        ? 'KV'
-        : SalesUser.initialsFromName(draftName);
-    final title = registerMode ? 'Crea tu cuenta' : 'Bienvenido';
-    final subtitle = registerMode
-        ? 'Primer ingreso a KONFI Ventas'
-        : 'Ingresa a tu agenda';
+    const title = 'Bienvenida';
+    const subtitle = 'Ingresa con tu usuario del Sistema Gerencial';
 
     return ListView(
       padding: const EdgeInsets.fromLTRB(18, 24, 18, 24),
@@ -827,7 +797,7 @@ class _SellerRegistrationPageState extends State<SellerRegistrationPage> {
         const SizedBox(height: 18),
         Row(
           children: [
-            InitialsAvatar(initials: registrationInitials, size: 58),
+            const KmiLogoMark(width: 86, height: 58),
             const SizedBox(width: 14),
             Expanded(
               child: Column(
@@ -853,90 +823,8 @@ class _SellerRegistrationPageState extends State<SellerRegistrationPage> {
         const SizedBox(height: 24),
         GlassCard(
           padding: const EdgeInsets.all(16),
-          child: registerMode ? buildRegisterForm() : buildLoginForm(),
+          child: buildLoginForm(),
         ),
-        const SizedBox(height: 12),
-        TextButton.icon(
-          onPressed: () => setState(() => registerMode = !registerMode),
-          icon: Icon(
-            registerMode
-                ? Icons.login_outlined
-                : Icons.person_add_alt_1_outlined,
-          ),
-          label: Text(
-            registerMode
-                ? 'Ya tengo usuario y contrasena'
-                : 'Crear una cuenta nueva',
-          ),
-        ),
-        TextButton.icon(
-          onPressed: () => setState(() => showExisting = !showExisting),
-          icon: Icon(
-            showExisting ? Icons.keyboard_arrow_up : Icons.keyboard_arrow_down,
-          ),
-          label: Text(
-            showExisting
-                ? 'Ocultar perfiles existentes'
-                : 'Ya tengo un perfil creado',
-          ),
-        ),
-        if (showExisting)
-          GlassCard(
-            padding: const EdgeInsets.all(16),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const Text(
-                  'Perfiles disponibles',
-                  style: TextStyle(fontWeight: FontWeight.w900),
-                ),
-                const SizedBox(height: 10),
-                DropdownButtonFormField<SalesUser>(
-                  initialValue: seller,
-                  decoration: const InputDecoration(
-                    labelText: 'Selecciona tu perfil',
-                    prefixIcon: Icon(Icons.badge_outlined),
-                  ),
-                  items: [
-                    for (final item in availableSellers)
-                      DropdownMenuItem(value: item, child: Text(item.name)),
-                  ],
-                  onChanged: (value) {
-                    if (value == null) return;
-                    setState(() => selectedSeller = value);
-                  },
-                ),
-                const SizedBox(height: 14),
-                Row(
-                  children: [
-                    Expanded(
-                      child: SessionMetric(
-                        label: 'Agenda',
-                        value: '$assignedAgenda',
-                      ),
-                    ),
-                    const SizedBox(width: 10),
-                    Expanded(
-                      child: SessionMetric(
-                        label: 'Pipeline',
-                        value:
-                            '\$${(assignedPipeline / 1000).toStringAsFixed(1)}k',
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 14),
-                SizedBox(
-                  width: double.infinity,
-                  child: OutlinedButton.icon(
-                    onPressed: () => widget.onRegister(seller),
-                    icon: const Icon(Icons.login_outlined),
-                    label: const Text('Entrar con este perfil'),
-                  ),
-                ),
-              ],
-            ),
-          ),
         if (widget.offlineReason != null) ...[
           const SizedBox(height: 12),
           OfflineBanner(
@@ -953,7 +841,7 @@ class _SellerRegistrationPageState extends State<SellerRegistrationPage> {
               SizedBox(width: 10),
               Expanded(
                 child: Text(
-                  'La sesion define agenda, pipeline, formularios y KPIs visibles para el vendedor.',
+                  'Tu usuario KMI abre exclusivamente las oportunidades, agenda y KPIs vinculados en el CRM.',
                   style: TextStyle(color: AppColors.muted),
                 ),
               ),
@@ -1276,7 +1164,7 @@ class DarkBackdrop extends StatelessWidget {
         gradient: LinearGradient(
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
-          colors: [Color(0xFF06100F), Color(0xFF0B191B), Color(0xFF05080D)],
+          colors: [Color(0xFF111A2D), Color(0xFF17233A), Color(0xFF10271F)],
         ),
       ),
       child: Stack(
@@ -1349,14 +1237,14 @@ class AppHeader extends StatelessWidget {
       padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
       child: Row(
         children: [
-          InitialsAvatar(initials: seller.initials),
+          const KmiLogoMark(width: 66, height: 42),
           const SizedBox(width: 12),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 const Text(
-                  'Agenda de campo',
+                  'KMI Ventas',
                   style: TextStyle(fontSize: 23, fontWeight: FontWeight.w900),
                 ),
                 Text(
@@ -1377,6 +1265,27 @@ class AppHeader extends StatelessWidget {
             icon: const Icon(Icons.add_business_outlined),
           ),
         ],
+      ),
+    );
+  }
+}
+
+class KmiLogoMark extends StatelessWidget {
+  const KmiLogoMark({required this.width, required this.height, super.key});
+
+  final double width;
+  final double height;
+
+  @override
+  Widget build(BuildContext context) {
+    return SizedBox(
+      width: width,
+      height: height,
+      child: Image.asset(
+        'assets/kmi-logo.png',
+        fit: BoxFit.contain,
+        filterQuality: FilterQuality.high,
+        semanticLabel: 'KMI',
       ),
     );
   }
@@ -1725,7 +1634,7 @@ class AgendaPage extends StatefulWidget {
 
   final SalesStore store;
   final Future<void> Function(String agendaId, VisitStatus status)
-  onStatusChange;
+      onStatusChange;
   final ValueChanged<String> onOpenOpportunity;
   final ValueChanged<int> onCaptureForm;
   final VoidCallback onNewGestion;
@@ -1766,9 +1675,8 @@ class _AgendaPageState extends State<AgendaPage> {
               tooltip: 'Filtrar fecha exacta',
               onPressed: pickExactDate,
               style: IconButton.styleFrom(
-                backgroundColor: selectedDate == null
-                    ? AppColors.green
-                    : AppColors.cyan,
+                backgroundColor:
+                    selectedDate == null ? AppColors.green : AppColors.cyan,
               ),
               icon: const Icon(Icons.calendar_month_outlined),
             ),
@@ -1803,9 +1711,9 @@ class _AgendaPageState extends State<AgendaPage> {
       builder: (context, child) => Theme(
         data: Theme.of(context).copyWith(
           colorScheme: Theme.of(context).colorScheme.copyWith(
-            primary: AppColors.green,
-            surface: AppColors.surface,
-          ),
+                primary: AppColors.green,
+                surface: AppColors.surface,
+              ),
         ),
         child: child ?? const SizedBox.shrink(),
       ),
@@ -1912,9 +1820,8 @@ class FilterBar extends StatelessWidget {
                   foregroundColor: selected == value
                       ? const Color(0xFF04100F)
                       : AppColors.muted,
-                  backgroundColor: selected == value
-                      ? AppColors.green
-                      : Colors.transparent,
+                  backgroundColor:
+                      selected == value ? AppColors.green : Colors.transparent,
                   shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(12),
                   ),
@@ -1945,7 +1852,7 @@ class AgendaTimeline extends StatelessWidget {
   final SalesStore store;
   final ValueChanged<String> onOpenOpportunity;
   final Future<void> Function(String agendaId, VisitStatus status)
-  onStatusChange;
+      onStatusChange;
   final ValueChanged<int> onCaptureForm;
 
   @override
@@ -2070,7 +1977,7 @@ class _ScheduleRow extends StatelessWidget {
   final Opportunity? opportunity;
   final ValueChanged<String> onOpenOpportunity;
   final Future<void> Function(String agendaId, VisitStatus status)
-  onStatusChange;
+      onStatusChange;
   final ValueChanged<int> onCaptureForm;
 
   @override
@@ -2200,7 +2107,7 @@ class _TaskContent extends StatelessWidget {
   final AgendaItem item;
   final Opportunity opportunity;
   final Future<void> Function(String agendaId, VisitStatus status)
-  onStatusChange;
+      onStatusChange;
   final ValueChanged<int> onCaptureForm;
 
   @override
@@ -2737,7 +2644,7 @@ class OpportunityActionSheet extends StatefulWidget {
   final AgendaItem? agenda;
   final Future<void> Function(String result, String note) onSaveResult;
   final Future<void> Function(String agendaId, VisitStatus status)
-  onStatusChange;
+      onStatusChange;
   final VoidCallback onCaptureForm;
 
   @override
@@ -2794,11 +2701,11 @@ class _OpportunityActionSheetState extends State<OpportunityActionSheet> {
                 onPressed: widget.agenda == null
                     ? null
                     : () => unawaited(
-                        widget.onStatusChange(
-                          widget.agenda!.id,
-                          VisitStatus.inVisit,
+                          widget.onStatusChange(
+                            widget.agenda!.id,
+                            VisitStatus.inVisit,
+                          ),
                         ),
-                      ),
                 icon: const Icon(Icons.location_on_outlined),
               ),
               const SizedBox(width: 12),
@@ -2807,11 +2714,11 @@ class _OpportunityActionSheetState extends State<OpportunityActionSheet> {
                 onPressed: widget.agenda == null
                     ? null
                     : () => unawaited(
-                        widget.onStatusChange(
-                          widget.agenda!.id,
-                          VisitStatus.done,
+                          widget.onStatusChange(
+                            widget.agenda!.id,
+                            VisitStatus.done,
+                          ),
                         ),
-                      ),
                 icon: const Icon(Icons.check_circle_outline),
               ),
               const SizedBox(width: 12),
@@ -3796,9 +3703,8 @@ class KonfiApiClient {
     final cleanBase = baseUrl.endsWith('/')
         ? baseUrl.substring(0, baseUrl.length - 1)
         : baseUrl;
-    final cleanPrefix = pathPrefix.startsWith('/')
-        ? pathPrefix
-        : '/$pathPrefix';
+    final cleanPrefix =
+        pathPrefix.startsWith('/') ? pathPrefix : '/$pathPrefix';
     final cleanPath = path.startsWith('/') ? path : '/$path';
     return Uri.parse('$cleanBase$cleanPrefix$cleanPath');
   }
@@ -3910,9 +3816,8 @@ class KonfiApiClient {
       'status': draft.status,
       'responsible': draft.responsible,
       'ownerId': ownerId,
-      'nextAction': draft.strategy.isEmpty
-          ? 'Seguimiento comercial'
-          : draft.strategy,
+      'nextAction':
+          draft.strategy.isEmpty ? 'Seguimiento comercial' : draft.strategy,
       'nextDate': nextDate,
       'lastNote': draft.comment,
       'comment': draft.comment,
@@ -4056,8 +3961,8 @@ class SalesStore {
     required this.forms,
     Map<String, List<Map<String, String>>>? formResponses,
     List<VisitResult>? visitResults,
-  }) : formResponses = formResponses ?? {},
-       visitResults = visitResults ?? [];
+  })  : formResponses = formResponses ?? {},
+        visitResults = visitResults ?? [];
 
   final SalesUser currentSeller;
   final List<SalesUser> sellers;
@@ -4314,8 +4219,28 @@ class SalesStore {
       return users.isNotEmpty ? users.first : SalesStore.seed().currentSeller;
     }
 
+    final crmSeller = pickSeller();
+    final sessionUser = _map(json['sessionUser']);
+    final sessionName = _text(sessionUser['name']);
+    final currentSeller = sessionName.isEmpty
+        ? crmSeller
+        : SalesUser(
+            id: crmSeller.id,
+            name: sessionName,
+            initials: SalesUser.initialsFromName(sessionName),
+            firstName:
+                _text(sessionUser['firstName'], sessionName.split(' ').first),
+            lastName: _text(sessionUser['lastName']),
+            dui: crmSeller.dui,
+            address: crmSeller.address,
+            roleId: crmSeller.roleId,
+            phone: crmSeller.phone,
+            email: _text(sessionUser['email'], crmSeller.email),
+            territory: crmSeller.territory,
+          );
+
     return SalesStore(
-      currentSeller: pickSeller(),
+      currentSeller: currentSeller,
       sellers: users.isNotEmpty ? users : SalesStore.seed().sellers,
       stages: stages.isNotEmpty ? stages : SalesStore.seed().stages,
       opportunities: opportunities,
@@ -4366,9 +4291,8 @@ class SalesStore {
   SalesStore withUpdatedSeller(SalesUser seller) {
     return SalesStore(
       currentSeller: seller,
-      sellers: sellers
-          .map((item) => item.id == seller.id ? seller : item)
-          .toList(),
+      sellers:
+          sellers.map((item) => item.id == seller.id ? seller : item).toList(),
       stages: stages,
       opportunities: opportunities,
       agenda: agenda,
@@ -4398,17 +4322,16 @@ class SalesStore {
   List<Opportunity> get myOpportunities =>
       opportunities.where((item) => item.ownerId == currentSeller.id).toList();
 
-  List<Opportunity> get myActiveOpportunities =>
-      myOpportunities
-          .where(
-            (item) => !{
-              'ganada',
-              'perdida',
-              'cancelada',
-            }.contains(item.status.toLowerCase()),
-          )
-          .toList()
-        ..sort((a, b) => a.deadline.compareTo(b.deadline));
+  List<Opportunity> get myActiveOpportunities => myOpportunities
+      .where(
+        (item) => !{
+          'ganada',
+          'perdida',
+          'cancelada',
+        }.contains(item.status.toLowerCase()),
+      )
+      .toList()
+    ..sort((a, b) => a.deadline.compareTo(b.deadline));
 
   List<AgendaItem> get myAgenda =>
       agenda.where((item) => item.ownerId == currentSeller.id).toList();
@@ -4520,9 +4443,8 @@ class SalesStore {
       status: draft.status,
       responsible: draft.responsible,
       ownerId: currentSeller.id,
-      nextAction: draft.strategy.isEmpty
-          ? 'Seguimiento comercial'
-          : draft.strategy,
+      nextAction:
+          draft.strategy.isEmpty ? 'Seguimiento comercial' : draft.strategy,
       note: draft.comment,
       comment: draft.comment,
     );
@@ -4598,9 +4520,8 @@ class SalesUser {
       firstName: parsedFirstName.isEmpty
           ? _firstNameFromFullName(name)
           : parsedFirstName,
-      lastName: parsedLastName.isEmpty
-          ? _lastNameFromFullName(name)
-          : parsedLastName,
+      lastName:
+          parsedLastName.isEmpty ? _lastNameFromFullName(name) : parsedLastName,
       dui: _text(json['dui']),
       address: _text(json['address']),
       roleId: _text(json['roleId'], 'sales_exec'),

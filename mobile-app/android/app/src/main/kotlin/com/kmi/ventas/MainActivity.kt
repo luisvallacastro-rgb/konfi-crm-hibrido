@@ -1,4 +1,4 @@
-package com.example.konfi_sales_app
+package com.kmi.ventas
 
 import io.flutter.embedding.android.FlutterActivity
 
