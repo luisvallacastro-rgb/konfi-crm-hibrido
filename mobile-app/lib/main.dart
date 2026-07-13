@@ -3627,6 +3627,7 @@ class _OpportunityEditorSheetState extends State<OpportunityEditorSheet> {
   late final TextEditingController comment;
   late int stageId;
   late String status;
+  late String closureResult;
 
   @override
   void initState() {
@@ -3649,6 +3650,10 @@ class _OpportunityEditorSheetState extends State<OpportunityEditorSheet> {
     comment = TextEditingController(text: opportunity?.comment ?? '');
     stageId = opportunity?.stageId ?? 1;
     status = opportunity?.status ?? 'Vigente';
+    closureResult = status.toLowerCase() == 'perdida' ? 'perdida' : 'ganado';
+    if (!_isClosureStage(stageId) && _isClosedStatus(status)) {
+      status = 'Vigente';
+    }
   }
 
   @override
@@ -3751,49 +3756,85 @@ class _OpportunityEditorSheetState extends State<OpportunityEditorSheet> {
             ],
           ),
           const SizedBox(height: 10),
-          Row(
-            children: [
-              Expanded(
-                child: DropdownButtonFormField<int>(
-                  initialValue: stageId,
-                  isExpanded: true,
-                  decoration: const InputDecoration(labelText: 'Etapa'),
-                  items: [
-                    for (final stage in widget.store.stages)
-                      DropdownMenuItem(
-                        value: stage.id,
-                        child: Text(
-                          '${stage.id}. ${stage.name}',
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                        ),
-                      ),
-                  ],
-                  onChanged: (value) =>
-                      setState(() => stageId = value ?? stageId),
+          DropdownButtonFormField<int>(
+            initialValue: stageId,
+            isExpanded: true,
+            decoration: const InputDecoration(labelText: 'Etapa'),
+            items: [
+              for (final stage in widget.store.stages)
+                DropdownMenuItem(
+                  value: stage.id,
+                  child: Text(
+                    '${stage.id}. ${stage.name}',
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
                 ),
-              ),
-              const SizedBox(width: 10),
-              Expanded(
-                child: DropdownButtonFormField<String>(
-                  initialValue: status,
-                  isExpanded: true,
-                  decoration: const InputDecoration(labelText: 'Estatus'),
-                  items: const [
-                    DropdownMenuItem(value: 'Vigente', child: Text('Vigente')),
-                    DropdownMenuItem(
-                      value: 'En negociacion',
-                      child: Text('En negociacion'),
-                    ),
-                    DropdownMenuItem(value: 'Ganada', child: Text('Ganada')),
-                    DropdownMenuItem(value: 'Perdida', child: Text('Perdida')),
-                    DropdownMenuItem(value: 'Pausada', child: Text('Pausada')),
-                  ],
-                  onChanged: (value) =>
-                      setState(() => status = value ?? status),
-                ),
-              ),
             ],
+            onChanged: (value) {
+              setState(() {
+                stageId = value ?? stageId;
+                if (_isClosureStage(stageId)) {
+                  status = _statusFromClosureResult();
+                } else if (_isClosedStatus(status)) {
+                  status = 'Vigente';
+                }
+              });
+            },
+          ),
+          const SizedBox(height: 10),
+          AnimatedSwitcher(
+            duration: const Duration(milliseconds: 240),
+            switchInCurve: Curves.easeOutCubic,
+            switchOutCurve: Curves.easeInCubic,
+            child: _isClosureStage(stageId)
+                ? DropdownButtonFormField<String>(
+                    key: const ValueKey('closure-result'),
+                    initialValue: closureResult,
+                    isExpanded: true,
+                    decoration: const InputDecoration(
+                      labelText: 'Resultado de cierre',
+                      prefixIcon: Icon(Icons.flag_outlined),
+                    ),
+                    items: const [
+                      DropdownMenuItem(
+                        value: 'ganado',
+                        child: Text('Ganado'),
+                      ),
+                      DropdownMenuItem(
+                        value: 'perdida',
+                        child: Text('Perdida'),
+                      ),
+                    ],
+                    onChanged: (value) {
+                      setState(() {
+                        closureResult = value ?? closureResult;
+                        status = _statusFromClosureResult();
+                      });
+                    },
+                  )
+                : DropdownButtonFormField<String>(
+                    key: const ValueKey('opportunity-status'),
+                    initialValue: status,
+                    isExpanded: true,
+                    decoration: const InputDecoration(labelText: 'Estatus'),
+                    items: const [
+                      DropdownMenuItem(
+                        value: 'Vigente',
+                        child: Text('Vigente'),
+                      ),
+                      DropdownMenuItem(
+                        value: 'En negociacion',
+                        child: Text('En negociacion'),
+                      ),
+                      DropdownMenuItem(
+                        value: 'Pausada',
+                        child: Text('Pausada'),
+                      ),
+                    ],
+                    onChanged: (value) =>
+                        setState(() => status = value ?? status),
+                  ),
           ),
           const SizedBox(height: 10),
           TextField(
@@ -3853,6 +3894,8 @@ class _OpportunityEditorSheetState extends State<OpportunityEditorSheet> {
   }
 
   void submit() {
+    final savedStatus =
+        _isClosureStage(stageId) ? _statusFromClosureResult() : status;
     widget.onSave(
       OpportunityDraft(
         startDate: startDate.text,
@@ -3863,12 +3906,30 @@ class _OpportunityEditorSheetState extends State<OpportunityEditorSheet> {
         stageId: stageId,
         closePercent: int.tryParse(closePercent.text) ?? 0,
         strategy: strategy.text,
-        status: status,
+        status: savedStatus,
         phone: phone.text,
         responsible: responsible.text,
         comment: comment.text,
       ),
     );
+  }
+
+  bool _isClosureStage(int candidateStageId) {
+    for (final stage in widget.store.stages) {
+      if (stage.id != candidateStageId) continue;
+      final name = stage.name.toLowerCase();
+      return name.contains('cierre') || stage.id == 6;
+    }
+    return candidateStageId == 6;
+  }
+
+  bool _isClosedStatus(String value) {
+    final normalized = value.toLowerCase();
+    return normalized == 'ganada' || normalized == 'perdida';
+  }
+
+  String _statusFromClosureResult() {
+    return closureResult == 'ganado' ? 'Ganada' : 'Perdida';
   }
 }
 
