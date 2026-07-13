@@ -962,7 +962,7 @@ class _SellerRegistrationPageState extends State<SellerRegistrationPage>
   InputDecorationTheme _authInputTheme() {
     final border = OutlineInputBorder(
       borderRadius: BorderRadius.circular(18),
-      borderSide: BorderSide(color: AppColors.line),
+      borderSide: const BorderSide(color: AppColors.line),
     );
     return InputDecorationTheme(
       filled: true,
@@ -1413,38 +1413,49 @@ class AppHeader extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final firstName = seller.name.trim().split(RegExp(r'\s+')).first;
+
     return Padding(
-      padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
-      child: Row(
-        children: [
-          const KmiLogoMark(width: 66, height: 42),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
+      padding: const EdgeInsets.fromLTRB(16, 8, 16, 6),
+      child: SizedBox(
+        height: 70,
+        child: Stack(
+          alignment: Alignment.center,
+          children: [
+            Align(
+              alignment: Alignment.centerLeft,
+              child: IconButton(
+                tooltip: 'Mi perfil',
+                onPressed: onOpenProfile,
+                icon: const Icon(Icons.account_circle_outlined),
+              ),
+            ),
+            Column(
+              mainAxisSize: MainAxisSize.min,
               children: [
-                const Text(
-                  'KMI Ventas',
-                  style: TextStyle(fontSize: 23, fontWeight: FontWeight.w900),
-                ),
+                const KmiLogoMark(width: 78, height: 42),
+                const SizedBox(height: 2),
                 Text(
-                  '${seller.name} - Ejecutivo de ventas',
-                  style: const TextStyle(color: AppColors.muted),
+                  firstName,
+                  style: const TextStyle(
+                    color: AppColors.muted,
+                    fontSize: 13,
+                    fontWeight: FontWeight.w700,
+                    letterSpacing: .2,
+                  ),
                 ),
               ],
             ),
-          ),
-          IconButton(
-            tooltip: 'Mi perfil',
-            onPressed: onOpenProfile,
-            icon: const Icon(Icons.account_circle_outlined),
-          ),
-          IconButton.filledTonal(
-            tooltip: 'Nueva oportunidad',
-            onPressed: onNewOpportunity,
-            icon: const Icon(Icons.add_business_outlined),
-          ),
-        ],
+            Align(
+              alignment: Alignment.centerRight,
+              child: IconButton.filledTonal(
+                tooltip: 'Nueva oportunidad',
+                onPressed: onNewOpportunity,
+                icon: const Icon(Icons.add_business_outlined),
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
