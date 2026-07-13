@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:convert';
+import 'dart:math' as math;
 import 'dart:ui';
 
 import 'package:flutter/material.dart';
@@ -746,10 +747,9 @@ class SellerRegistrationPage extends StatefulWidget {
   State<SellerRegistrationPage> createState() => _SellerRegistrationPageState();
 }
 
-class _SellerRegistrationPageState extends State<SellerRegistrationPage> {
-  final loginUserController = TextEditingController(
-    text: 'asesorayc@konfinversiones.com',
-  );
+class _SellerRegistrationPageState extends State<SellerRegistrationPage>
+    with TickerProviderStateMixin {
+  final loginUserController = TextEditingController();
   final loginPasswordController = TextEditingController();
   final firstNameController = TextEditingController();
   final lastNameController = TextEditingController();
@@ -760,12 +760,19 @@ class _SellerRegistrationPageState extends State<SellerRegistrationPage> {
   final passwordController = TextEditingController();
   final confirmPasswordController = TextEditingController();
   bool saving = false;
+  bool registerMode = false;
   bool showLoginPassword = false;
   bool showRegisterPassword = false;
   bool showConfirmPassword = false;
+  late final AnimationController introController;
+  late final AnimationController ambientController;
+  late final Animation<double> introFade;
+  late final Animation<Offset> introSlide;
 
   @override
   void dispose() {
+    introController.dispose();
+    ambientController.dispose();
     loginUserController.dispose();
     loginPasswordController.dispose();
     firstNameController.dispose();
@@ -782,89 +789,172 @@ class _SellerRegistrationPageState extends State<SellerRegistrationPage> {
   @override
   void initState() {
     super.initState();
+    introController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 760),
+    )..forward();
+    ambientController = AnimationController(
+      vsync: this,
+      duration: const Duration(seconds: 5),
+    )..repeat();
+    introFade = CurvedAnimation(
+      parent: introController,
+      curve: const Interval(0, 0.82, curve: Curves.easeOutCubic),
+    );
+    introSlide = Tween<Offset>(
+      begin: const Offset(0, 0.08),
+      end: Offset.zero,
+    ).animate(
+        CurvedAnimation(parent: introController, curve: Curves.easeOutCubic));
     firstNameController.addListener(() => setState(() {}));
     lastNameController.addListener(() => setState(() {}));
   }
 
   @override
   Widget build(BuildContext context) {
-    const title = 'Bienvenida';
-    const subtitle = 'Ingresa con tu usuario del Sistema Gerencial';
-
-    return ListView(
-      padding: const EdgeInsets.fromLTRB(18, 24, 18, 24),
-      children: [
-        const SizedBox(height: 18),
-        Row(
-          children: [
-            const KmiLogoMark(width: 86, height: 58),
-            const SizedBox(width: 14),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    title,
-                    style: const TextStyle(
-                      fontSize: 25,
-                      fontWeight: FontWeight.w900,
-                    ),
+    return LayoutBuilder(
+      builder: (context, constraints) => SingleChildScrollView(
+        padding: const EdgeInsets.symmetric(horizontal: 22, vertical: 30),
+        child: ConstrainedBox(
+          constraints: BoxConstraints(minHeight: constraints.maxHeight - 60),
+          child: Center(
+            child: FadeTransition(
+              opacity: introFade,
+              child: SlideTransition(
+                position: introSlide,
+                child: ConstrainedBox(
+                  constraints: const BoxConstraints(maxWidth: 430),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      AnimatedBuilder(
+                        animation: ambientController,
+                        builder: (context, child) {
+                          final phase = ambientController.value * math.pi * 2;
+                          return Transform.translate(
+                            offset: Offset(0, math.sin(phase) * 4),
+                            child: Transform.scale(
+                              scale: 1 + math.sin(phase) * 0.012,
+                              child: child,
+                            ),
+                          );
+                        },
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 22,
+                            vertical: 10,
+                          ),
+                          decoration: BoxDecoration(
+                            borderRadius: BorderRadius.circular(30),
+                            boxShadow: [
+                              BoxShadow(
+                                color: AppColors.green.withValues(alpha: 0.2),
+                                blurRadius: 46,
+                                spreadRadius: 2,
+                              ),
+                            ],
+                          ),
+                          child: const KmiLogoMark(width: 138, height: 86),
+                        ),
+                      ),
+                      const SizedBox(height: 28),
+                      _AuthGlassSurface(
+                        child: Theme(
+                          data: Theme.of(context).copyWith(
+                            inputDecorationTheme: _authInputTheme(),
+                          ),
+                          child: AnimatedSwitcher(
+                            duration: const Duration(milliseconds: 360),
+                            switchInCurve: Curves.easeOutCubic,
+                            switchOutCurve: Curves.easeInCubic,
+                            transitionBuilder: (child, animation) =>
+                                FadeTransition(
+                              opacity: animation,
+                              child: ScaleTransition(
+                                scale: Tween<double>(begin: 0.975, end: 1)
+                                    .animate(animation),
+                                child: child,
+                              ),
+                            ),
+                            child: KeyedSubtree(
+                              key: ValueKey(registerMode),
+                              child: registerMode
+                                  ? buildRegisterForm()
+                                  : buildLoginForm(),
+                            ),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: 14),
+                      TextButton(
+                        onPressed: saving
+                            ? null
+                            : () =>
+                                setState(() => registerMode = !registerMode),
+                        style: TextButton.styleFrom(
+                          foregroundColor: AppColors.green,
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 18,
+                            vertical: 12,
+                          ),
+                        ),
+                        child: Text(
+                          registerMode
+                              ? 'Ya tengo usuario · Iniciar sesión'
+                              : '¿No tienes usuario? · Regístrate',
+                          textAlign: TextAlign.center,
+                          style: const TextStyle(fontWeight: FontWeight.w800),
+                        ),
+                      ),
+                      if (widget.offlineReason != null) ...[
+                        const SizedBox(height: 10),
+                        OfflineBanner(
+                          message: widget.offlineReason!,
+                          onRetry: widget.onRetry,
+                        ),
+                      ],
+                    ],
                   ),
-                  const SizedBox(height: 3),
-                  Text(
-                    subtitle,
-                    style: const TextStyle(color: AppColors.muted),
-                  ),
-                ],
-              ),
-            ),
-          ],
-        ),
-        const SizedBox(height: 24),
-        GlassCard(
-          padding: const EdgeInsets.all(16),
-          child: buildLoginForm(),
-        ),
-        if (widget.offlineReason != null) ...[
-          const SizedBox(height: 12),
-          OfflineBanner(
-            message: widget.offlineReason!,
-            onRetry: widget.onRetry,
-          ),
-        ],
-        const SizedBox(height: 18),
-        const GlassCard(
-          padding: EdgeInsets.all(14),
-          child: Row(
-            children: [
-              Icon(Icons.verified_user_outlined, color: AppColors.green),
-              SizedBox(width: 10),
-              Expanded(
-                child: Text(
-                  'Tu usuario KMI abre exclusivamente las oportunidades, agenda y KPIs vinculados en el CRM.',
-                  style: TextStyle(color: AppColors.muted),
                 ),
               ),
-            ],
+            ),
           ),
         ),
-      ],
+      ),
+    );
+  }
+
+  InputDecorationTheme _authInputTheme() {
+    final border = OutlineInputBorder(
+      borderRadius: BorderRadius.circular(18),
+      borderSide: BorderSide(color: AppColors.line),
+    );
+    return InputDecorationTheme(
+      filled: true,
+      fillColor: Colors.white.withValues(alpha: 0.055),
+      labelStyle: const TextStyle(
+        color: AppColors.muted,
+        fontWeight: FontWeight.w700,
+      ),
+      prefixIconColor: AppColors.green,
+      suffixIconColor: AppColors.muted,
+      contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 18),
+      border: border,
+      enabledBorder: border,
+      focusedBorder: border.copyWith(
+        borderSide: const BorderSide(color: AppColors.green, width: 1.5),
+      ),
     );
   }
 
   Widget buildLoginForm() {
     return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
+      crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        const Text(
-          'Iniciar sesion',
-          style: TextStyle(fontWeight: FontWeight.w900),
-        ),
-        const SizedBox(height: 10),
         TextField(
           controller: loginUserController,
           decoration: const InputDecoration(
-            labelText: 'Usuario o correo',
+            labelText: 'Usuario',
             prefixIcon: Icon(Icons.person_outline),
           ),
           keyboardType: TextInputType.emailAddress,
@@ -874,7 +964,7 @@ class _SellerRegistrationPageState extends State<SellerRegistrationPage> {
         TextField(
           controller: loginPasswordController,
           decoration: InputDecoration(
-            labelText: 'Contrasena',
+            labelText: 'Contraseña',
             prefixIcon: const Icon(Icons.lock_outline),
             suffixIcon: IconButton(
               tooltip: showLoginPassword ? 'Ocultar' : 'Mostrar',
@@ -890,20 +980,29 @@ class _SellerRegistrationPageState extends State<SellerRegistrationPage> {
           obscureText: !showLoginPassword,
           textInputAction: TextInputAction.done,
         ),
-        const SizedBox(height: 14),
-        SizedBox(
-          width: double.infinity,
-          child: FilledButton.icon(
-            onPressed: saving ? null : submitLogin,
-            icon: saving
-                ? const SizedBox(
-                    width: 18,
-                    height: 18,
-                    child: CircularProgressIndicator(strokeWidth: 2),
-                  )
-                : const Icon(Icons.login_outlined),
-            label: const Text('Ingresar'),
+        const SizedBox(height: 18),
+        FilledButton.icon(
+          onPressed: saving ? null : submitLogin,
+          style: FilledButton.styleFrom(
+            minimumSize: const Size.fromHeight(56),
+            backgroundColor: AppColors.green,
+            foregroundColor: AppColors.page,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(18),
+            ),
+            textStyle: const TextStyle(
+              fontSize: 16,
+              fontWeight: FontWeight.w900,
+            ),
           ),
+          icon: saving
+              ? const SizedBox(
+                  width: 18,
+                  height: 18,
+                  child: CircularProgressIndicator(strokeWidth: 2),
+                )
+              : const Icon(Icons.arrow_forward_rounded),
+          label: const Text('Ingresar'),
         ),
       ],
     );
@@ -914,8 +1013,9 @@ class _SellerRegistrationPageState extends State<SellerRegistrationPage> {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         const Text(
-          'Registro inicial',
-          style: TextStyle(fontWeight: FontWeight.w900),
+          'Crear usuario',
+          textAlign: TextAlign.center,
+          style: TextStyle(fontSize: 20, fontWeight: FontWeight.w900),
         ),
         const SizedBox(height: 10),
         TextField(
@@ -978,7 +1078,7 @@ class _SellerRegistrationPageState extends State<SellerRegistrationPage> {
         TextField(
           controller: passwordController,
           decoration: InputDecoration(
-            labelText: 'Contrasena',
+            labelText: 'Contraseña',
             prefixIcon: const Icon(Icons.lock_outline),
             suffixIcon: IconButton(
               tooltip: showRegisterPassword ? 'Ocultar' : 'Mostrar',
@@ -998,7 +1098,7 @@ class _SellerRegistrationPageState extends State<SellerRegistrationPage> {
         TextField(
           controller: confirmPasswordController,
           decoration: InputDecoration(
-            labelText: 'Confirmar contrasena',
+            labelText: 'Confirmar contraseña',
             prefixIcon: const Icon(Icons.lock_reset_outlined),
             suffixIcon: IconButton(
               tooltip: showConfirmPassword ? 'Ocultar' : 'Mostrar',
@@ -1015,19 +1115,25 @@ class _SellerRegistrationPageState extends State<SellerRegistrationPage> {
           textInputAction: TextInputAction.done,
         ),
         const SizedBox(height: 14),
-        SizedBox(
-          width: double.infinity,
-          child: FilledButton.icon(
-            onPressed: saving ? null : submitRegistration,
-            icon: saving
-                ? const SizedBox(
-                    width: 18,
-                    height: 18,
-                    child: CircularProgressIndicator(strokeWidth: 2),
-                  )
-                : const Icon(Icons.person_add_alt_1_outlined),
-            label: const Text('Registrarme y entrar'),
+        FilledButton.icon(
+          onPressed: saving ? null : submitRegistration,
+          style: FilledButton.styleFrom(
+            minimumSize: const Size.fromHeight(56),
+            backgroundColor: AppColors.green,
+            foregroundColor: AppColors.page,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(18),
+            ),
+            textStyle: const TextStyle(fontWeight: FontWeight.w900),
           ),
+          icon: saving
+              ? const SizedBox(
+                  width: 18,
+                  height: 18,
+                  child: CircularProgressIndicator(strokeWidth: 2),
+                )
+              : const Icon(Icons.person_add_alt_1_outlined),
+          label: const Text('Registrarme y entrar'),
         ),
       ],
     );
@@ -1121,6 +1227,45 @@ class _SellerRegistrationPageState extends State<SellerRegistrationPage> {
   bool _validDui(String value) {
     final digits = value.replaceAll(RegExp(r'\D'), '');
     return digits.length == 8 || digits.length == 9;
+  }
+}
+
+class _AuthGlassSurface extends StatelessWidget {
+  const _AuthGlassSurface({required this.child});
+
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) {
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(30),
+      child: BackdropFilter(
+        filter: ImageFilter.blur(sigmaX: 24, sigmaY: 24),
+        child: Container(
+          padding: const EdgeInsets.all(22),
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(30),
+            gradient: LinearGradient(
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+              colors: [
+                Colors.white.withValues(alpha: 0.09),
+                AppColors.surface.withValues(alpha: 0.76),
+              ],
+            ),
+            border: Border.all(color: Colors.white.withValues(alpha: 0.12)),
+            boxShadow: const [
+              BoxShadow(
+                color: Color(0x5C020817),
+                blurRadius: 46,
+                offset: Offset(0, 24),
+              ),
+            ],
+          ),
+          child: child,
+        ),
+      ),
+    );
   }
 }
 
