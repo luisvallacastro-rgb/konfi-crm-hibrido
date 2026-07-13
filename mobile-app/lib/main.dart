@@ -3756,12 +3756,17 @@ class _OpportunityEditorSheetState extends State<OpportunityEditorSheet> {
               Expanded(
                 child: DropdownButtonFormField<int>(
                   initialValue: stageId,
+                  isExpanded: true,
                   decoration: const InputDecoration(labelText: 'Etapa'),
                   items: [
                     for (final stage in widget.store.stages)
                       DropdownMenuItem(
                         value: stage.id,
-                        child: Text('${stage.id}. ${stage.name}'),
+                        child: Text(
+                          '${stage.id}. ${stage.name}',
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
                       ),
                   ],
                   onChanged: (value) =>
@@ -3772,6 +3777,7 @@ class _OpportunityEditorSheetState extends State<OpportunityEditorSheet> {
               Expanded(
                 child: DropdownButtonFormField<String>(
                   initialValue: status,
+                  isExpanded: true,
                   decoration: const InputDecoration(labelText: 'Estatus'),
                   items: const [
                     DropdownMenuItem(value: 'Vigente', child: Text('Vigente')),
