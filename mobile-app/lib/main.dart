@@ -416,8 +416,8 @@ class _SalesShellState extends State<SalesShell> {
         store: activeStore,
         opportunity: opportunity,
         agenda: agenda,
-        onSaveResult: (result, note) =>
-            saveOpportunityGestion(opportunity.id, result, note, agenda),
+        onSaveGestion: (draft) =>
+            saveOpportunityGestion(opportunity.id, draft, agenda),
         onStatusChange: (agendaId, status) {
           Navigator.pop(context);
           return syncAgendaStatus(agendaId, status);
@@ -531,20 +531,22 @@ class _SalesShellState extends State<SalesShell> {
 
   Future<void> saveOpportunityGestion(
     String opportunityId,
-    String result,
-    String note,
+    OpportunityGestionDraft draft,
     AgendaItem? agenda,
   ) async {
     final current = store;
     if (current == null) return;
-    current.addVisitResult(opportunityId, result, note);
+    current.addVisitResult(
+      opportunityId,
+      draft.closureResult.isEmpty ? 'Gestion registrada' : draft.closureResult,
+      draft.comment,
+    );
     refresh();
 
     try {
       final loaded = await api.createGestion(
         opportunityId,
-        result,
-        note,
+        draft,
         agenda: agenda,
         previous: current,
       );
@@ -3202,7 +3204,7 @@ class OpportunityActionSheet extends StatefulWidget {
     required this.store,
     required this.opportunity,
     required this.agenda,
-    required this.onSaveResult,
+    required this.onSaveGestion,
     required this.onStatusChange,
     required this.onCaptureForm,
     super.key,
@@ -3211,7 +3213,7 @@ class OpportunityActionSheet extends StatefulWidget {
   final SalesStore store;
   final Opportunity opportunity;
   final AgendaItem? agenda;
-  final Future<void> Function(String result, String note) onSaveResult;
+  final Future<void> Function(OpportunityGestionDraft draft) onSaveGestion;
   final Future<void> Function(String agendaId, VisitStatus status)
       onStatusChange;
   final VoidCallback onCaptureForm;
@@ -3221,12 +3223,29 @@ class OpportunityActionSheet extends StatefulWidget {
 }
 
 class _OpportunityActionSheetState extends State<OpportunityActionSheet> {
-  final noteController = TextEditingController();
-  String result = 'Sin resultado';
+  final commentController = TextEditingController();
+  late final TextEditingController dateController;
+  int selectedTab = 0;
+  int managementStageId = 1;
+  String closureResult = 'ganado';
+  bool saving = false;
+
+  @override
+  void initState() {
+    super.initState();
+    dateController = TextEditingController(
+      text: DateTime.now().toIso8601String().substring(0, 10),
+    );
+    managementStageId = widget.opportunity.stageId;
+    closureResult = widget.opportunity.status.toLowerCase() == 'perdida'
+        ? 'perdida'
+        : 'ganado';
+  }
 
   @override
   void dispose() {
-    noteController.dispose();
+    commentController.dispose();
+    dateController.dispose();
     super.dispose();
   }
 
@@ -3249,113 +3268,315 @@ class _OpportunityActionSheetState extends State<OpportunityActionSheet> {
             style: const TextStyle(color: AppColors.muted),
           ),
           const SizedBox(height: 14),
-          DetailTile(
-            label: 'Etapa',
-            value: '${opportunity.stageId}. ${opportunity.stageName}',
-          ),
-          DetailTile(label: 'Producto', value: opportunity.product),
-          DetailTile(label: 'Venta probable', value: opportunity.amountLabel),
-          DetailTile(label: '% cierre', value: '${opportunity.closePercent}%'),
-          DetailTile(label: 'Estatus', value: opportunity.status),
-          DetailTile(label: 'Fecha inicio', value: opportunity.startDate),
-          DetailTile(label: 'Fecha limite', value: opportunity.deadlineLabel),
-          DetailTile(label: 'Estrategia', value: opportunity.strategy),
-          DetailTile(label: 'Comentario', value: opportunity.comment),
-          const SizedBox(height: 10),
-          Row(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              IconButton.filled(
-                tooltip: 'Check-in',
-                onPressed: widget.agenda == null
-                    ? null
-                    : () => unawaited(
-                          widget.onStatusChange(
-                            widget.agenda!.id,
-                            VisitStatus.inVisit,
-                          ),
-                        ),
-                icon: const Icon(Icons.location_on_outlined),
-              ),
-              const SizedBox(width: 12),
-              IconButton.outlined(
-                tooltip: 'Marcar realizada',
-                onPressed: widget.agenda == null
-                    ? null
-                    : () => unawaited(
-                          widget.onStatusChange(
-                            widget.agenda!.id,
-                            VisitStatus.done,
-                          ),
-                        ),
-                icon: const Icon(Icons.check_circle_outline),
-              ),
-              const SizedBox(width: 12),
-              IconButton.outlined(
-                tooltip: 'Capturar formulario de etapa',
-                onPressed: widget.onCaptureForm,
-                icon: const Icon(Icons.assignment_outlined),
-              ),
-            ],
-          ),
-          const SizedBox(height: 6),
-          const Center(
-            child: Text(
-              'Check-in · Realizada · Formulario',
-              style: TextStyle(color: AppColors.muted, fontSize: 12),
+          Container(
+            padding: const EdgeInsets.all(4),
+            decoration: BoxDecoration(
+              color: Colors.white.withValues(alpha: .04),
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(color: AppColors.line),
+            ),
+            child: Row(
+              children: [
+                Expanded(
+                  child: OpportunitySheetTabButton(
+                    label: 'Resumen',
+                    icon: Icons.dashboard_outlined,
+                    selected: selectedTab == 0,
+                    onTap: () => setState(() => selectedTab = 0),
+                  ),
+                ),
+                Expanded(
+                  child: OpportunitySheetTabButton(
+                    label: 'Gestiones',
+                    icon: Icons.history_rounded,
+                    selected: selectedTab == 1,
+                    onTap: () => setState(() => selectedTab = 1),
+                  ),
+                ),
+              ],
             ),
           ),
-          const SizedBox(height: 12),
-          DropdownButtonFormField<String>(
-            initialValue: result,
-            decoration: const InputDecoration(labelText: 'Resultado de visita'),
-            items: const [
-              DropdownMenuItem(
-                value: 'Sin resultado',
-                child: Text('Sin resultado'),
-              ),
-              DropdownMenuItem(
-                value: 'Necesita cotizacion',
-                child: Text('Necesita cotizacion'),
-              ),
-              DropdownMenuItem(
-                value: 'Objecion precio',
-                child: Text('Objecion precio'),
-              ),
-              DropdownMenuItem(
-                value: 'Enviar muestras',
-                child: Text('Enviar muestras'),
-              ),
-              DropdownMenuItem(
-                value: 'Listo para cierre',
-                child: Text('Listo para cierre'),
-              ),
-            ],
-            onChanged: (value) => setState(() => result = value ?? result),
-          ),
-          const SizedBox(height: 10),
-          TextField(
-            controller: noteController,
-            minLines: 2,
-            maxLines: 4,
-            decoration: const InputDecoration(
-              labelText: 'Nota de seguimiento',
-              hintText: 'Necesidad, objecion, compromiso o proxima accion',
-            ),
-          ),
-          const SizedBox(height: 12),
-          SizedBox(
-            width: double.infinity,
-            child: FilledButton.icon(
-              onPressed: () {
-                Navigator.pop(context);
-                unawaited(widget.onSaveResult(result, noteController.text));
-              },
-              icon: const Icon(Icons.save_outlined),
-              label: const Text('Guardar resultado'),
-            ),
+          const SizedBox(height: 14),
+          AnimatedSwitcher(
+            duration: const Duration(milliseconds: 240),
+            child: selectedTab == 0
+                ? _buildSummary(opportunity)
+                : _buildManagements(),
           ),
         ],
+      ),
+    );
+  }
+
+  Widget _buildSummary(Opportunity opportunity) {
+    return Column(
+      key: const ValueKey('opportunity-summary'),
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        DetailTile(
+          label: 'Etapa',
+          value: '${opportunity.stageId}. ${opportunity.stageName}',
+        ),
+        DetailTile(label: 'Producto', value: opportunity.product),
+        DetailTile(label: 'Venta probable', value: opportunity.amountLabel),
+        DetailTile(label: '% cierre', value: '${opportunity.closePercent}%'),
+        DetailTile(label: 'Estatus', value: opportunity.status),
+        DetailTile(label: 'Fecha inicio', value: opportunity.startDate),
+        DetailTile(label: 'Fecha limite', value: opportunity.deadlineLabel),
+        DetailTile(label: 'Estrategia', value: opportunity.strategy),
+        DetailTile(label: 'Comentario', value: opportunity.comment),
+        const SizedBox(height: 10),
+        Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            IconButton.filled(
+              tooltip: 'Check-in',
+              onPressed: widget.agenda == null
+                  ? null
+                  : () => unawaited(
+                        widget.onStatusChange(
+                          widget.agenda!.id,
+                          VisitStatus.inVisit,
+                        ),
+                      ),
+              icon: const Icon(Icons.location_on_outlined),
+            ),
+            const SizedBox(width: 12),
+            IconButton.outlined(
+              tooltip: 'Marcar realizada',
+              onPressed: widget.agenda == null
+                  ? null
+                  : () => unawaited(
+                        widget.onStatusChange(
+                          widget.agenda!.id,
+                          VisitStatus.done,
+                        ),
+                      ),
+              icon: const Icon(Icons.check_circle_outline),
+            ),
+            const SizedBox(width: 12),
+            IconButton.outlined(
+              tooltip: 'Capturar formulario de etapa',
+              onPressed: widget.onCaptureForm,
+              icon: const Icon(Icons.assignment_outlined),
+            ),
+          ],
+        ),
+        const SizedBox(height: 6),
+        const Center(
+          child: Text(
+            'Check-in · Realizada · Formulario',
+            style: TextStyle(color: AppColors.muted, fontSize: 12),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildManagements() {
+    final records = widget.store.gestionesForOpportunity(
+      widget.opportunity.id,
+    );
+    final isClosing = _isClosureStage(managementStageId);
+    return Column(
+      key: const ValueKey('opportunity-managements'),
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const SectionTitle(
+          eyebrow: 'Historial',
+          title: 'Gestiones registradas',
+        ),
+        const SizedBox(height: 10),
+        if (records.isEmpty)
+          const EmptyBlock(text: 'Aun no hay gestiones para esta oportunidad.')
+        else
+          for (final record in records) GestionHistoryCard(record: record),
+        const SizedBox(height: 18),
+        const SectionTitle(
+          eyebrow: 'Nuevo registro',
+          title: 'Nueva gestion',
+        ),
+        const SizedBox(height: 12),
+        TextField(
+          controller: dateController,
+          keyboardType: TextInputType.datetime,
+          decoration: const InputDecoration(
+            labelText: 'Fecha',
+            prefixIcon: Icon(Icons.event_outlined),
+          ),
+        ),
+        const SizedBox(height: 10),
+        DropdownButtonFormField<int>(
+          initialValue: managementStageId,
+          isExpanded: true,
+          decoration: const InputDecoration(
+            labelText: 'Etapa a la que pasa',
+            prefixIcon: Icon(Icons.route_outlined),
+          ),
+          items: [
+            for (final stage in widget.store.stages)
+              DropdownMenuItem(
+                value: stage.id,
+                child: Text(
+                  '${stage.id}. ${stage.name}',
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ),
+          ],
+          onChanged: (value) =>
+              setState(() => managementStageId = value ?? managementStageId),
+        ),
+        if (isClosing) ...[
+          const SizedBox(height: 10),
+          DropdownButtonFormField<String>(
+            initialValue: closureResult,
+            isExpanded: true,
+            decoration: const InputDecoration(
+              labelText: 'Resultado de cierre',
+              prefixIcon: Icon(Icons.flag_outlined),
+            ),
+            items: const [
+              DropdownMenuItem(value: 'ganado', child: Text('Ganado')),
+              DropdownMenuItem(value: 'perdida', child: Text('Perdida')),
+            ],
+            onChanged: (value) =>
+                setState(() => closureResult = value ?? closureResult),
+          ),
+        ],
+        const SizedBox(height: 10),
+        TextField(
+          controller: commentController,
+          minLines: 3,
+          maxLines: 5,
+          decoration: const InputDecoration(
+            labelText: 'Comentario de la gestion',
+            hintText: 'Detalle de la gestion realizada',
+          ),
+        ),
+        const SizedBox(height: 12),
+        SizedBox(
+          width: double.infinity,
+          child: FilledButton.icon(
+            onPressed: saving ? null : _saveManagement,
+            icon: saving
+                ? const SizedBox(
+                    width: 18,
+                    height: 18,
+                    child: CircularProgressIndicator(strokeWidth: 2),
+                  )
+                : const Icon(Icons.add_task_outlined),
+            label: const Text('Agregar gestion'),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Future<void> _saveManagement() async {
+    if (commentController.text.trim().isEmpty) return;
+    setState(() => saving = true);
+    await widget.onSaveGestion(
+      OpportunityGestionDraft(
+        date: dateController.text.trim(),
+        stageId: managementStageId,
+        closureResult: _isClosureStage(managementStageId) ? closureResult : '',
+        comment: commentController.text.trim(),
+      ),
+    );
+    if (!mounted) return;
+    Navigator.pop(context);
+  }
+
+  bool _isClosureStage(int stageId) {
+    for (final stage in widget.store.stages) {
+      if (stage.id != stageId) continue;
+      return stage.id == 6 || stage.name.toLowerCase().contains('cierre');
+    }
+    return stageId == 6;
+  }
+}
+
+class OpportunitySheetTabButton extends StatelessWidget {
+  const OpportunitySheetTabButton({
+    required this.label,
+    required this.icon,
+    required this.selected,
+    required this.onTap,
+    super.key,
+  });
+
+  final String label;
+  final IconData icon;
+  final bool selected;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return TextButton.icon(
+      onPressed: onTap,
+      style: TextButton.styleFrom(
+        foregroundColor: selected ? AppColors.page : AppColors.muted,
+        backgroundColor: selected ? AppColors.green : Colors.transparent,
+        padding: const EdgeInsets.symmetric(vertical: 11),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      ),
+      icon: Icon(icon, size: 18),
+      label: Text(label),
+    );
+  }
+}
+
+class GestionHistoryCard extends StatelessWidget {
+  const GestionHistoryCard({required this.record, super.key});
+
+  final GestionRecord record;
+
+  @override
+  Widget build(BuildContext context) {
+    final hasClosureResult =
+        record.result == 'ganado' || record.result == 'perdida';
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 8),
+      child: GlassCard(
+        padding: const EdgeInsets.all(12),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Expanded(
+                  child: Text(
+                    '${record.date} · ${record.time}',
+                    style: const TextStyle(
+                      color: AppColors.muted,
+                      fontSize: 12,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                ),
+                if (hasClosureResult)
+                  CompactOpportunityMeta(
+                    icon: record.result == 'ganado'
+                        ? Icons.check_circle_outline
+                        : Icons.cancel_outlined,
+                    text: record.result == 'ganado' ? 'Ganado' : 'Perdida',
+                    highlighted: record.result == 'ganado',
+                  ),
+              ],
+            ),
+            const SizedBox(height: 7),
+            Text(
+              record.stageName,
+              style: const TextStyle(
+                color: AppColors.green,
+                fontWeight: FontWeight.w900,
+              ),
+            ),
+            const SizedBox(height: 4),
+            Text(record.note),
+          ],
+        ),
       ),
     );
   }
@@ -4377,8 +4598,7 @@ class KonfiApiClient {
 
   Future<SalesStore> createGestion(
     String opportunityId,
-    String result,
-    String note, {
+    OpportunityGestionDraft draft, {
     AgendaItem? agenda,
     SalesStore? previous,
   }) async {
@@ -4391,11 +4611,12 @@ class KonfiApiClient {
       body: jsonEncode({
         'opportunityId': opportunityId,
         'type': 'Gestion app',
-        'date': now.toIso8601String().substring(0, 10),
+        'date': draft.date,
         'time': time,
         'status': 'Realizada',
-        'result': result,
-        'note': note,
+        'stageId': draft.stageId,
+        'result': draft.closureResult,
+        'note': draft.comment,
         'agendaId': agenda?.id,
         'place': agenda?.place,
         'locationLabel': agenda == null
@@ -4606,9 +4827,11 @@ class SalesStore {
     required this.opportunities,
     required this.agenda,
     required this.forms,
+    List<GestionRecord>? gestiones,
     Map<String, List<Map<String, String>>>? formResponses,
     List<VisitResult>? visitResults,
-  })  : formResponses = formResponses ?? {},
+  })  : gestiones = gestiones ?? [],
+        formResponses = formResponses ?? {},
         visitResults = visitResults ?? [];
 
   final SalesUser currentSeller;
@@ -4617,6 +4840,7 @@ class SalesStore {
   final List<Opportunity> opportunities;
   final List<AgendaItem> agenda;
   final List<StageForm> forms;
+  final List<GestionRecord> gestiones;
   final Map<String, List<Map<String, String>>> formResponses;
   final List<VisitResult> visitResults;
 
@@ -4854,6 +5078,9 @@ class SalesStore {
     final forms = _list(
       json['forms'],
     ).map((item) => StageForm.fromJson(_map(item))).toList();
+    final gestiones = _list(json['gestiones'])
+        .map((item) => GestionRecord.fromJson(_map(item), stages))
+        .toList();
 
     SalesUser pickSeller() {
       final activeUserId = _text(json['activeUserId']);
@@ -4893,6 +5120,7 @@ class SalesStore {
       opportunities: opportunities,
       agenda: agenda,
       forms: forms.isNotEmpty ? forms : SalesStore.seed().forms,
+      gestiones: gestiones,
       formResponses: previous == null
           ? {}
           : previous.formResponses.map(
@@ -4913,6 +5141,7 @@ class SalesStore {
       opportunities: opportunities,
       agenda: agenda,
       forms: forms,
+      gestiones: gestiones,
       formResponses: formResponses,
       visitResults: visitResults,
     );
@@ -4930,6 +5159,7 @@ class SalesStore {
       opportunities: opportunities,
       agenda: agenda,
       forms: forms,
+      gestiones: gestiones,
       formResponses: formResponses,
       visitResults: visitResults,
     );
@@ -4944,6 +5174,7 @@ class SalesStore {
       opportunities: opportunities,
       agenda: agenda,
       forms: forms,
+      gestiones: gestiones,
       formResponses: formResponses,
       visitResults: visitResults,
     );
@@ -4961,6 +5192,7 @@ class SalesStore {
       opportunities: opportunities,
       agenda: agenda,
       forms: forms,
+      gestiones: gestiones,
       formResponses: formResponses,
       visitResults: visitResults,
     );
@@ -5034,6 +5266,13 @@ class SalesStore {
       if (item.opportunityId == opportunityId) return item;
     }
     return null;
+  }
+
+  List<GestionRecord> gestionesForOpportunity(String opportunityId) {
+    final items =
+        gestiones.where((item) => item.opportunityId == opportunityId).toList();
+    items.sort((a, b) => b.sortKey.compareTo(a.sortKey));
+    return items;
   }
 
   StageForm formForStage(int stageId) {
@@ -5443,6 +5682,70 @@ class VisitResult {
   final String result;
   final String note;
   final DateTime createdAt;
+}
+
+class GestionRecord {
+  const GestionRecord({
+    required this.id,
+    required this.opportunityId,
+    required this.stageId,
+    required this.stageName,
+    required this.date,
+    required this.time,
+    required this.result,
+    required this.note,
+    required this.source,
+  });
+
+  final String id;
+  final String opportunityId;
+  final int stageId;
+  final String stageName;
+  final String date;
+  final String time;
+  final String result;
+  final String note;
+  final String source;
+
+  String get sortKey => '$date $time';
+
+  factory GestionRecord.fromJson(
+    Map<String, dynamic> json,
+    List<SalesStage> stages,
+  ) {
+    final stageId = _int(json['stageId']);
+    var stageName = _text(json['stageName']);
+    if (stageName.isEmpty) {
+      for (final stage in stages) {
+        if (stage.id == stageId) stageName = stage.name;
+      }
+    }
+    return GestionRecord(
+      id: _text(json['id']),
+      opportunityId: _text(json['opportunityId']),
+      stageId: stageId,
+      stageName: stageName.isEmpty ? 'Seguimiento' : stageName,
+      date: _text(json['date']),
+      time: _text(json['time']),
+      result: _text(json['result']),
+      note: _text(json['note'], 'Gestion registrada'),
+      source: _text(json['source'], 'CRM'),
+    );
+  }
+}
+
+class OpportunityGestionDraft {
+  const OpportunityGestionDraft({
+    required this.date,
+    required this.stageId,
+    required this.closureResult,
+    required this.comment,
+  });
+
+  final String date;
+  final int stageId;
+  final String closureResult;
+  final String comment;
 }
 
 class OpportunityDraft {
