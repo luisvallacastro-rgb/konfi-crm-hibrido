@@ -1860,14 +1860,12 @@ class ActivePipelineHero extends StatelessWidget {
           const SizedBox(height: 16),
           Row(
             children: [
-              Expanded(
-                child: OutlinedButton.icon(
-                  onPressed: onNotifications,
-                  icon: const Icon(Icons.notifications_none_rounded, size: 19),
-                  label: const Text('Asignaciones'),
-                ),
+              IconButton.outlined(
+                tooltip: 'Asignaciones CRM',
+                onPressed: onNotifications,
+                icon: const Icon(Icons.notifications_none_rounded, size: 21),
               ),
-              const SizedBox(width: 10),
+              const Spacer(),
               FilledButton.icon(
                 onPressed: onNewOpportunity,
                 icon: const Icon(Icons.add_rounded, size: 20),
