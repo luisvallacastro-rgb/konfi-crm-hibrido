@@ -3627,7 +3627,7 @@ class _OpportunityEditorSheetState extends State<OpportunityEditorSheet> {
   late final TextEditingController comment;
   late int stageId;
   late String status;
-  late String closureResult;
+  String closureResult = 'ganado';
 
   @override
   void initState() {
