@@ -166,28 +166,50 @@ class _SalesShellState extends State<SalesShell> {
       );
     }
 
-    final pages = [
-      OpportunitiesPage(
-        store: safeStore,
-        unreadOpportunityIds: unreadAssignmentIds,
-        onMarkAssignmentsRead: markAssignmentsRead,
-        onNewOpportunity: () => openOpportunityEditorSheet(),
-        onOpenOpportunity: openOpportunitySheet,
-        onEditOpportunity: (opportunity) =>
-            openOpportunityEditorSheet(opportunity: opportunity),
-        onSync: loadStore,
-      ),
-      AgendaPage(
-        store: safeStore,
-        onStatusChange: syncAgendaStatus,
-        onOpenOpportunity: openOpportunitySheet,
-        onCaptureForm: openFormCaptureSheet,
-        onNewGestion: openScheduledGestionSheet,
-      ),
-      PipelinePage(store: safeStore, onOpenOpportunity: openOpportunitySheet),
-      FormsPage(store: safeStore, onCaptureForm: openFormCaptureSheet),
-      KpiPage(store: safeStore),
-    ];
+    final managerMode = seller.isManager;
+    final pages = managerMode
+        ? [
+            ManagerHomePage(
+              store: safeStore,
+              onAssignOpportunity: () => openManagerAssignmentSheet(),
+              onOpenOpportunity: openOpportunitySheet,
+              onSync: loadStore,
+            ),
+            ManagerTeamPage(
+              store: safeStore,
+              onAssignOpportunity: openManagerAssignmentSheet,
+              onOpenOpportunity: openOpportunitySheet,
+            ),
+            ManagerPipelinePage(
+              store: safeStore,
+              onOpenOpportunity: openOpportunitySheet,
+            ),
+          ]
+        : [
+            OpportunitiesPage(
+              store: safeStore,
+              unreadOpportunityIds: unreadAssignmentIds,
+              onMarkAssignmentsRead: markAssignmentsRead,
+              onNewOpportunity: () => openOpportunityEditorSheet(),
+              onOpenOpportunity: openOpportunitySheet,
+              onEditOpportunity: (opportunity) =>
+                  openOpportunityEditorSheet(opportunity: opportunity),
+              onSync: loadStore,
+            ),
+            AgendaPage(
+              store: safeStore,
+              onStatusChange: syncAgendaStatus,
+              onOpenOpportunity: openOpportunitySheet,
+              onCaptureForm: openFormCaptureSheet,
+              onNewGestion: openScheduledGestionSheet,
+            ),
+            PipelinePage(
+              store: safeStore,
+              onOpenOpportunity: openOpportunitySheet,
+            ),
+            FormsPage(store: safeStore, onCaptureForm: openFormCaptureSheet),
+            KpiPage(store: safeStore),
+          ];
 
     return Scaffold(
       extendBody: true,
@@ -199,7 +221,10 @@ class _SalesShellState extends State<SalesShell> {
               children: [
                 AppHeader(
                   seller: seller,
-                  onNewOpportunity: () => openOpportunityEditorSheet(),
+                  managerMode: managerMode,
+                  onNewOpportunity: managerMode
+                      ? () => openManagerAssignmentSheet()
+                      : () => openOpportunityEditorSheet(),
                   onOpenProfile: openProfileSheet,
                 ),
                 if (offlineReason != null)
@@ -216,6 +241,7 @@ class _SalesShellState extends State<SalesShell> {
         ],
       ),
       bottomNavigationBar: SalesBottomNav(
+        managerMode: managerMode,
         selectedIndex: tabIndex,
         onSelected: (index) => setState(() => tabIndex = index),
       ),
@@ -338,6 +364,14 @@ class _SalesShellState extends State<SalesShell> {
   }
 
   void _activateAssignmentMonitoring(SalesStore activeStore) {
+    if (activeStore.currentSeller.isManager) {
+      assignmentPoller?.cancel();
+      assignmentPoller = null;
+      assignmentBaselineReady = false;
+      knownAssignmentIds.clear();
+      unreadAssignmentIds.clear();
+      return;
+    }
     knownAssignmentIds
       ..clear()
       ..addAll(activeStore.myOpportunities.map((item) => item.id));
@@ -413,6 +447,20 @@ class _SalesShellState extends State<SalesShell> {
   void openProfileSheet() {
     final activeSeller = registeredSeller;
     if (activeSeller == null) return;
+    if (activeSeller.isManager) {
+      showModalBottomSheet<void>(
+        context: context,
+        backgroundColor: Colors.transparent,
+        builder: (context) => ManagerProfileSheet(
+          user: activeSeller,
+          onLogout: () {
+            Navigator.pop(context);
+            switchSeller();
+          },
+        ),
+      );
+      return;
+    }
     showModalBottomSheet<void>(
       context: context,
       isScrollControlled: true,
@@ -580,6 +628,79 @@ class _SalesShellState extends State<SalesShell> {
     );
   }
 
+  void openManagerAssignmentSheet([SalesUser? assignedSeller]) {
+    final activeStore = store ?? SalesStore.seed();
+    if (assignedSeller == null) {
+      showModalBottomSheet<void>(
+        context: context,
+        isScrollControlled: true,
+        backgroundColor: Colors.transparent,
+        builder: (context) => ManagerSellerPickerSheet(
+          store: activeStore,
+          onSelected: (seller) {
+            Navigator.pop(context);
+            Future<void>.delayed(
+              const Duration(milliseconds: 180),
+              () {
+                if (mounted) openManagerAssignmentSheet(seller);
+              },
+            );
+          },
+        ),
+      );
+      return;
+    }
+
+    showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (context) => OpportunityEditorSheet(
+        store: activeStore.withSeller(assignedSeller),
+        onSave: (draft) {
+          Navigator.pop(context);
+          unawaited(saveManagerOpportunityDraft(draft, assignedSeller));
+        },
+      ),
+    );
+  }
+
+  Future<void> saveManagerOpportunityDraft(
+    OpportunityDraft draft,
+    SalesUser assignedSeller,
+  ) async {
+    final current = store ?? SalesStore.seed();
+    try {
+      final loaded = await api.createOpportunity(
+        draft,
+        assignedSeller.id,
+        previous: current,
+        source: 'CRM gerencia',
+      );
+      if (!mounted) return;
+      setState(() {
+        store = loaded.withSeller(current.currentSeller);
+        offlineReason = null;
+      });
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          behavior: SnackBarBehavior.floating,
+          backgroundColor: AppColors.surfaceStrong,
+          content: Text(
+            'Oportunidad asignada a ${assignedSeller.firstName.isEmpty ? assignedSeller.name : assignedSeller.firstName}',
+            style: const TextStyle(color: AppColors.ink),
+          ),
+        ),
+      );
+    } catch (error) {
+      if (!mounted) return;
+      setState(() {
+        offlineReason =
+            'No se pudo asignar la oportunidad. Revisa la conexion.';
+      });
+    }
+  }
+
   Future<void> saveOpportunityDraft(
     OpportunityDraft draft, {
     Opportunity? opportunity,
@@ -743,15 +864,17 @@ class OfflineBanner extends StatelessWidget {
 
 class SalesBottomNav extends StatelessWidget {
   const SalesBottomNav({
+    required this.managerMode,
     required this.selectedIndex,
     required this.onSelected,
     super.key,
   });
 
+  final bool managerMode;
   final int selectedIndex;
   final ValueChanged<int> onSelected;
 
-  static const items = [
+  static const sellerItems = [
     _SalesNavItem(
       Icons.business_center_outlined,
       Icons.business_center,
@@ -767,8 +890,16 @@ class SalesBottomNav extends StatelessWidget {
     _SalesNavItem(Icons.query_stats_outlined, Icons.query_stats, 'KPIs'),
   ];
 
+  static const managerItems = [
+    _SalesNavItem(
+        Icons.space_dashboard_outlined, Icons.space_dashboard, 'Inicio'),
+    _SalesNavItem(Icons.groups_outlined, Icons.groups, 'Equipo'),
+    _SalesNavItem(Icons.view_kanban_outlined, Icons.view_kanban, 'Pipeline'),
+  ];
+
   @override
   Widget build(BuildContext context) {
+    final items = managerMode ? managerItems : sellerItems;
     return SafeArea(
       top: false,
       child: Padding(
@@ -870,6 +1001,912 @@ class _SalesBottomNavButton extends StatelessWidget {
       ),
     );
   }
+}
+
+class ManagerHomePage extends StatelessWidget {
+  const ManagerHomePage({
+    required this.store,
+    required this.onAssignOpportunity,
+    required this.onOpenOpportunity,
+    required this.onSync,
+    super.key,
+  });
+
+  final SalesStore store;
+  final VoidCallback onAssignOpportunity;
+  final ValueChanged<String> onOpenOpportunity;
+  final Future<void> Function() onSync;
+
+  @override
+  Widget build(BuildContext context) {
+    final active = store.opportunities.where(_isActiveOpportunity).toList();
+    final team =
+        store.sellers.where((item) => item.roleId == 'sales_exec').toList();
+    final total = active.fold<double>(0, (sum, item) => sum + item.amount);
+    final overdue = active.where(_isOverdueOpportunity).length;
+    final won = store.opportunities
+        .where((item) => item.status.toLowerCase() == 'ganada')
+        .length;
+    final lost = store.opportunities
+        .where((item) => item.status.toLowerCase() == 'perdida')
+        .length;
+    final rankedTeam = [...team]..sort((a, b) {
+        final aTotal = active
+            .where((item) => item.ownerId == a.id)
+            .fold<double>(0, (sum, item) => sum + item.amount);
+        final bTotal = active
+            .where((item) => item.ownerId == b.id)
+            .fold<double>(0, (sum, item) => sum + item.amount);
+        return bTotal.compareTo(aTotal);
+      });
+
+    return RefreshIndicator(
+      onRefresh: onSync,
+      child: ListView(
+        padding: const EdgeInsets.fromLTRB(16, 8, 16, 112),
+        children: [
+          ManagerHeroCard(
+            total: total,
+            opportunityCount: active.length,
+            sellerCount: team.length,
+            onAssignOpportunity: onAssignOpportunity,
+            onSync: onSync,
+          ),
+          const SizedBox(height: 18),
+          const SectionTitle(
+            eyebrow: 'Control comercial',
+            title: 'Pulso del negocio',
+          ),
+          const SizedBox(height: 10),
+          LayoutBuilder(
+            builder: (context, constraints) => GridView.count(
+              crossAxisCount: constraints.maxWidth >= 760 ? 4 : 2,
+              shrinkWrap: true,
+              physics: const NeverScrollableScrollPhysics(),
+              crossAxisSpacing: 10,
+              mainAxisSpacing: 10,
+              childAspectRatio: constraints.maxWidth >= 760 ? 1.75 : 1.35,
+              children: [
+                ManagerMetricCard(
+                  icon: Icons.warning_amber_rounded,
+                  label: 'Vencidas',
+                  value: '$overdue',
+                  color: overdue > 0 ? AppColors.red : AppColors.green,
+                ),
+                ManagerMetricCard(
+                  icon: Icons.task_alt_rounded,
+                  label: 'Ganadas',
+                  value: '$won',
+                  color: AppColors.green,
+                ),
+                ManagerMetricCard(
+                  icon: Icons.cancel_outlined,
+                  label: 'Perdidas',
+                  value: '$lost',
+                  color: AppColors.red,
+                ),
+                ManagerMetricCard(
+                  icon: Icons.event_available_outlined,
+                  label: 'En agenda',
+                  value: '${store.agenda.length}',
+                  color: AppColors.cyan,
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 18),
+          const SectionTitle(
+            eyebrow: 'Pipeline global',
+            title: 'Distribucion por etapa',
+          ),
+          const SizedBox(height: 10),
+          SizedBox(
+            height: 132,
+            child: ListView.separated(
+              scrollDirection: Axis.horizontal,
+              itemCount: store.stages.length,
+              separatorBuilder: (context, index) => const SizedBox(width: 10),
+              itemBuilder: (context, index) {
+                final stage = store.stages[index];
+                final stageItems =
+                    active.where((item) => item.stageId == stage.id).toList();
+                final stageTotal = stageItems.fold<double>(
+                  0,
+                  (sum, item) => sum + item.amount,
+                );
+                return ManagerStageSummaryCard(
+                  stage: stage,
+                  count: stageItems.length,
+                  total: stageTotal,
+                );
+              },
+            ),
+          ),
+          const SizedBox(height: 18),
+          Row(
+            children: [
+              const Expanded(
+                child: SectionTitle(
+                  eyebrow: 'Equipo',
+                  title: 'Cartera por vendedor',
+                ),
+              ),
+              CountPill(value: '${team.length}'),
+            ],
+          ),
+          const SizedBox(height: 10),
+          for (final seller in rankedTeam.take(5))
+            ManagerSellerPulse(
+              seller: seller,
+              opportunities:
+                  active.where((item) => item.ownerId == seller.id).toList(),
+              maxAmount: total,
+            ),
+          if (active.isNotEmpty) ...[
+            const SizedBox(height: 18),
+            const SectionTitle(
+              eyebrow: 'Atencion inmediata',
+              title: 'Oportunidades prioritarias',
+            ),
+            const SizedBox(height: 10),
+            for (final opportunity in ([...active]..sort((a, b) {
+                    final overdueOrder =
+                        (_isOverdueOpportunity(b) ? 1 : 0).compareTo(
+                      _isOverdueOpportunity(a) ? 1 : 0,
+                    );
+                    if (overdueOrder != 0) return overdueOrder;
+                    return b.amount.compareTo(a.amount);
+                  }))
+                .take(4))
+              MiniOpportunityTile(
+                opportunity: opportunity,
+                onTap: () => onOpenOpportunity(opportunity.id),
+              ),
+          ],
+        ],
+      ),
+    );
+  }
+}
+
+class ManagerHeroCard extends StatelessWidget {
+  const ManagerHeroCard({
+    required this.total,
+    required this.opportunityCount,
+    required this.sellerCount,
+    required this.onAssignOpportunity,
+    required this.onSync,
+    super.key,
+  });
+
+  final double total;
+  final int opportunityCount;
+  final int sellerCount;
+  final VoidCallback onAssignOpportunity;
+  final Future<void> Function() onSync;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [
+            AppColors.green.withValues(alpha: 0.2),
+            AppColors.surface.withValues(alpha: 0.96),
+          ],
+        ),
+        borderRadius: BorderRadius.circular(28),
+        border: Border.all(color: AppColors.green.withValues(alpha: 0.34)),
+        boxShadow: const [
+          BoxShadow(
+            color: Color(0x3300D7B1),
+            blurRadius: 34,
+            offset: Offset(0, 16),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Container(
+                width: 46,
+                height: 46,
+                decoration: BoxDecoration(
+                  color: AppColors.green.withValues(alpha: 0.16),
+                  borderRadius: BorderRadius.circular(16),
+                ),
+                child:
+                    const Icon(Icons.insights_rounded, color: AppColors.green),
+              ),
+              const SizedBox(width: 12),
+              const Expanded(
+                child: Text(
+                  'PIPELINE DEL EQUIPO',
+                  style: TextStyle(
+                    color: AppColors.green,
+                    fontWeight: FontWeight.w900,
+                    letterSpacing: 1,
+                  ),
+                ),
+              ),
+              IconButton(
+                tooltip: 'Actualizar',
+                onPressed: () => unawaited(onSync()),
+                icon: const Icon(Icons.sync_rounded),
+              ),
+            ],
+          ),
+          const SizedBox(height: 16),
+          Text(
+            _currency(total),
+            style: const TextStyle(
+              color: AppColors.ink,
+              fontSize: 36,
+              fontWeight: FontWeight.w900,
+              letterSpacing: -1.4,
+            ),
+          ),
+          const SizedBox(height: 5),
+          Text(
+            '$opportunityCount oportunidades activas · $sellerCount vendedores',
+            style: const TextStyle(
+              color: AppColors.muted,
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+          const SizedBox(height: 18),
+          SizedBox(
+            width: double.infinity,
+            child: FilledButton.icon(
+              onPressed: onAssignOpportunity,
+              icon: const Icon(Icons.person_add_alt_1_outlined),
+              label: const Text('Asignar oportunidad'),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class ManagerMetricCard extends StatelessWidget {
+  const ManagerMetricCard({
+    required this.icon,
+    required this.label,
+    required this.value,
+    required this.color,
+    super.key,
+  });
+
+  final IconData icon;
+  final String label;
+  final String value;
+  final Color color;
+
+  @override
+  Widget build(BuildContext context) {
+    return GlassCard(
+      padding: const EdgeInsets.all(14),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Icon(icon, color: color, size: 22),
+          const Spacer(),
+          Text(
+            value,
+            style: const TextStyle(fontSize: 24, fontWeight: FontWeight.w900),
+          ),
+          Text(label, style: const TextStyle(color: AppColors.muted)),
+        ],
+      ),
+    );
+  }
+}
+
+class ManagerStageSummaryCard extends StatelessWidget {
+  const ManagerStageSummaryCard({
+    required this.stage,
+    required this.count,
+    required this.total,
+    super.key,
+  });
+
+  final SalesStage stage;
+  final int count;
+  final double total;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: 178,
+      padding: const EdgeInsets.all(15),
+      decoration: BoxDecoration(
+        color: AppColors.surface.withValues(alpha: 0.82),
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: AppColors.line),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Expanded(
+                child: Text(
+                  'ETAPA ${stage.id}',
+                  style: const TextStyle(
+                    color: AppColors.muted,
+                    fontSize: 11,
+                    fontWeight: FontWeight.w900,
+                    letterSpacing: .7,
+                  ),
+                ),
+              ),
+              CountPill(value: '$count'),
+            ],
+          ),
+          const SizedBox(height: 8),
+          Text(
+            stage.name,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: const TextStyle(fontWeight: FontWeight.w900),
+          ),
+          const Spacer(),
+          Text(
+            _currency(total),
+            style: const TextStyle(
+              color: AppColors.green,
+              fontSize: 17,
+              fontWeight: FontWeight.w900,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class ManagerSellerPulse extends StatelessWidget {
+  const ManagerSellerPulse({
+    required this.seller,
+    required this.opportunities,
+    required this.maxAmount,
+    super.key,
+  });
+
+  final SalesUser seller;
+  final List<Opportunity> opportunities;
+  final double maxAmount;
+
+  @override
+  Widget build(BuildContext context) {
+    final total =
+        opportunities.fold<double>(0, (sum, item) => sum + item.amount);
+    final progress = maxAmount <= 0 ? 0.0 : (total / maxAmount).clamp(0.0, 1.0);
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 9),
+      child: GlassCard(
+        padding: const EdgeInsets.all(13),
+        child: Row(
+          children: [
+            InitialsAvatar(initials: seller.initials, size: 42),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    seller.name,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(fontWeight: FontWeight.w900),
+                  ),
+                  const SizedBox(height: 6),
+                  ClipRRect(
+                    borderRadius: BorderRadius.circular(8),
+                    child: LinearProgressIndicator(
+                      value: progress,
+                      minHeight: 5,
+                      backgroundColor: AppColors.line,
+                      color: AppColors.green,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(width: 12),
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.end,
+              children: [
+                Text(
+                  _currency(total),
+                  style: const TextStyle(
+                    color: AppColors.green,
+                    fontWeight: FontWeight.w900,
+                  ),
+                ),
+                Text(
+                  '${opportunities.length} activas',
+                  style: const TextStyle(color: AppColors.muted, fontSize: 11),
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class ManagerTeamPage extends StatefulWidget {
+  const ManagerTeamPage({
+    required this.store,
+    required this.onAssignOpportunity,
+    required this.onOpenOpportunity,
+    super.key,
+  });
+
+  final SalesStore store;
+  final void Function(SalesUser?) onAssignOpportunity;
+  final ValueChanged<String> onOpenOpportunity;
+
+  @override
+  State<ManagerTeamPage> createState() => _ManagerTeamPageState();
+}
+
+class _ManagerTeamPageState extends State<ManagerTeamPage> {
+  String query = '';
+
+  @override
+  Widget build(BuildContext context) {
+    final sellers = widget.store.sellers
+        .where(
+          (item) =>
+              item.roleId == 'sales_exec' &&
+              (query.isEmpty ||
+                  '${item.name} ${item.email}'
+                      .toLowerCase()
+                      .contains(query.toLowerCase())),
+        )
+        .toList();
+
+    return ListView(
+      padding: const EdgeInsets.fromLTRB(16, 8, 16, 112),
+      children: [
+        Row(
+          children: [
+            const Expanded(
+              child: SectionTitle(
+                eyebrow: 'Administracion comercial',
+                title: 'Equipo de ventas',
+              ),
+            ),
+            IconButton.filled(
+              tooltip: 'Asignar oportunidad',
+              onPressed: () => widget.onAssignOpportunity(null),
+              icon: const Icon(Icons.person_add_alt_1_outlined),
+            ),
+          ],
+        ),
+        const SizedBox(height: 12),
+        TextField(
+          onChanged: (value) => setState(() => query = value),
+          decoration: const InputDecoration(
+            labelText: 'Buscar vendedor',
+            prefixIcon: Icon(Icons.search_rounded),
+          ),
+        ),
+        const SizedBox(height: 14),
+        for (final seller in sellers)
+          ManagerTeamSellerCard(
+            seller: seller,
+            opportunities: widget.store.opportunities
+                .where((item) => item.ownerId == seller.id)
+                .toList(),
+            onAssign: () => widget.onAssignOpportunity(seller),
+            onTap: () => showModalBottomSheet<void>(
+              context: context,
+              isScrollControlled: true,
+              backgroundColor: Colors.transparent,
+              builder: (context) => ManagerSellerDetailSheet(
+                seller: seller,
+                opportunities: widget.store.opportunities
+                    .where((item) => item.ownerId == seller.id)
+                    .toList(),
+                onAssign: () {
+                  Navigator.pop(context);
+                  widget.onAssignOpportunity(seller);
+                },
+                onOpenOpportunity: (id) {
+                  Navigator.pop(context);
+                  widget.onOpenOpportunity(id);
+                },
+              ),
+            ),
+          ),
+        if (sellers.isEmpty)
+          const EmptyBlock(text: 'No hay vendedores con este criterio.'),
+      ],
+    );
+  }
+}
+
+class ManagerTeamSellerCard extends StatelessWidget {
+  const ManagerTeamSellerCard({
+    required this.seller,
+    required this.opportunities,
+    required this.onAssign,
+    required this.onTap,
+    super.key,
+  });
+
+  final SalesUser seller;
+  final List<Opportunity> opportunities;
+  final VoidCallback onAssign;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final active = opportunities.where(_isActiveOpportunity).toList();
+    final total = active.fold<double>(0, (sum, item) => sum + item.amount);
+    final overdue = active.where(_isOverdueOpportunity).length;
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 10),
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(20),
+        child: GlassCard(
+          padding: const EdgeInsets.all(15),
+          child: Column(
+            children: [
+              Row(
+                children: [
+                  InitialsAvatar(initials: seller.initials, size: 48),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          seller.name,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: const TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.w900,
+                          ),
+                        ),
+                        const SizedBox(height: 3),
+                        Text(
+                          seller.email.isEmpty
+                              ? seller.territory
+                              : seller.email,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: const TextStyle(
+                            color: AppColors.muted,
+                            fontSize: 12,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  IconButton(
+                    tooltip: 'Asignar oportunidad',
+                    onPressed: onAssign,
+                    icon: const Icon(
+                      Icons.add_business_outlined,
+                      color: AppColors.green,
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 13),
+              Row(
+                children: [
+                  Expanded(
+                    child: _ManagerInlineMetric(
+                      label: 'Cartera activa',
+                      value: _currency(total),
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: _ManagerInlineMetric(
+                      label: 'Oportunidades',
+                      value: '${active.length}',
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: _ManagerInlineMetric(
+                      label: 'Vencidas',
+                      value: '$overdue',
+                      alert: overdue > 0,
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _ManagerInlineMetric extends StatelessWidget {
+  const _ManagerInlineMetric({
+    required this.label,
+    required this.value,
+    this.alert = false,
+  });
+
+  final String label;
+  final String value;
+  final bool alert;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 10),
+      decoration: BoxDecoration(
+        color: Colors.white.withValues(alpha: 0.04),
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: AppColors.line),
+      ),
+      child: Column(
+        children: [
+          FittedBox(
+            child: Text(
+              value,
+              style: TextStyle(
+                color: alert ? AppColors.red : AppColors.ink,
+                fontWeight: FontWeight.w900,
+              ),
+            ),
+          ),
+          const SizedBox(height: 3),
+          Text(
+            label,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: const TextStyle(color: AppColors.muted, fontSize: 9.5),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class ManagerPipelinePage extends StatelessWidget {
+  const ManagerPipelinePage({
+    required this.store,
+    required this.onOpenOpportunity,
+    super.key,
+  });
+
+  final SalesStore store;
+  final ValueChanged<String> onOpenOpportunity;
+
+  @override
+  Widget build(BuildContext context) {
+    final active = store.opportunities.where(_isActiveOpportunity).toList();
+    return ListView(
+      padding: const EdgeInsets.fromLTRB(16, 8, 16, 112),
+      children: [
+        const SectionTitle(
+          eyebrow: 'Pipeline global',
+          title: 'Oportunidades del equipo',
+        ),
+        const SizedBox(height: 10),
+        for (final stage in store.stages)
+          StageLane(
+            stage: stage,
+            opportunities:
+                active.where((item) => item.stageId == stage.id).toList(),
+            onOpenOpportunity: onOpenOpportunity,
+          ),
+      ],
+    );
+  }
+}
+
+class ManagerSellerDetailSheet extends StatelessWidget {
+  const ManagerSellerDetailSheet({
+    required this.seller,
+    required this.opportunities,
+    required this.onAssign,
+    required this.onOpenOpportunity,
+    super.key,
+  });
+
+  final SalesUser seller;
+  final List<Opportunity> opportunities;
+  final VoidCallback onAssign;
+  final ValueChanged<String> onOpenOpportunity;
+
+  @override
+  Widget build(BuildContext context) {
+    final active = opportunities.where(_isActiveOpportunity).toList();
+    final total = active.fold<double>(0, (sum, item) => sum + item.amount);
+    return SheetShell(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              InitialsAvatar(initials: seller.initials, size: 50),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      seller.name,
+                      style: const TextStyle(
+                        fontSize: 20,
+                        fontWeight: FontWeight.w900,
+                      ),
+                    ),
+                    Text(
+                      '${active.length} activas · ${_currency(total)}',
+                      style: const TextStyle(color: AppColors.muted),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 16),
+          SizedBox(
+            width: double.infinity,
+            child: FilledButton.icon(
+              onPressed: onAssign,
+              icon: const Icon(Icons.add_business_outlined),
+              label: const Text('Asignar nueva oportunidad'),
+            ),
+          ),
+          const SizedBox(height: 16),
+          if (active.isEmpty)
+            const EmptyBlock(text: 'Este vendedor no tiene cartera activa.')
+          else
+            for (final opportunity in active)
+              MiniOpportunityTile(
+                opportunity: opportunity,
+                onTap: () => onOpenOpportunity(opportunity.id),
+              ),
+        ],
+      ),
+    );
+  }
+}
+
+class ManagerSellerPickerSheet extends StatelessWidget {
+  const ManagerSellerPickerSheet({
+    required this.store,
+    required this.onSelected,
+    super.key,
+  });
+
+  final SalesStore store;
+  final ValueChanged<SalesUser> onSelected;
+
+  @override
+  Widget build(BuildContext context) {
+    final sellers =
+        store.sellers.where((item) => item.roleId == 'sales_exec').toList();
+    return SheetShell(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Row(
+            children: [
+              Icon(Icons.person_search_outlined, color: AppColors.green),
+              SizedBox(width: 10),
+              Expanded(
+                child: Text(
+                  'Seleccionar vendedor',
+                  style: TextStyle(fontSize: 22, fontWeight: FontWeight.w900),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 5),
+          const Text(
+            'La oportunidad aparecera en su cartera y activara una notificacion.',
+            style: TextStyle(color: AppColors.muted),
+          ),
+          const SizedBox(height: 14),
+          for (final seller in sellers)
+            Padding(
+              padding: const EdgeInsets.only(bottom: 8),
+              child: ListTile(
+                onTap: () => onSelected(seller),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(16),
+                  side: const BorderSide(color: AppColors.line),
+                ),
+                tileColor: Colors.white.withValues(alpha: 0.04),
+                leading: InitialsAvatar(initials: seller.initials, size: 40),
+                title: Text(
+                  seller.name,
+                  style: const TextStyle(fontWeight: FontWeight.w900),
+                ),
+                subtitle: Text(
+                  seller.email.isEmpty ? seller.territory : seller.email,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+                trailing: const Icon(Icons.chevron_right_rounded),
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+}
+
+class ManagerProfileSheet extends StatelessWidget {
+  const ManagerProfileSheet({
+    required this.user,
+    required this.onLogout,
+    super.key,
+  });
+
+  final SalesUser user;
+  final VoidCallback onLogout;
+
+  @override
+  Widget build(BuildContext context) {
+    return SheetShell(
+      child: Column(
+        children: [
+          InitialsAvatar(initials: user.initials, size: 58),
+          const SizedBox(height: 12),
+          Text(
+            user.name,
+            textAlign: TextAlign.center,
+            style: const TextStyle(fontSize: 21, fontWeight: FontWeight.w900),
+          ),
+          const SizedBox(height: 4),
+          const Text(
+            'Administracion comercial',
+            style: TextStyle(color: AppColors.green),
+          ),
+          const SizedBox(height: 18),
+          SizedBox(
+            width: double.infinity,
+            child: OutlinedButton.icon(
+              onPressed: onLogout,
+              icon: const Icon(Icons.logout_outlined),
+              label: const Text('Cerrar sesion'),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+bool _isActiveOpportunity(Opportunity item) => !{
+      'ganada',
+      'perdida',
+      'cancelada',
+    }.contains(item.status.toLowerCase());
+
+bool _isOverdueOpportunity(Opportunity item) {
+  if (!_isActiveOpportunity(item) || item.deadline.isEmpty) return false;
+  final deadline = DateTime.tryParse(item.deadline);
+  if (deadline == null) return false;
+  final now = DateTime.now();
+  final today = DateTime(now.year, now.month, now.day);
+  return deadline.isBefore(today);
 }
 
 class SellerRegistrationPage extends StatefulWidget {
@@ -1514,12 +2551,14 @@ class Glow extends StatelessWidget {
 class AppHeader extends StatelessWidget {
   const AppHeader({
     required this.seller,
+    required this.managerMode,
     required this.onNewOpportunity,
     required this.onOpenProfile,
     super.key,
   });
 
   final SalesUser seller;
+  final bool managerMode;
   final VoidCallback onNewOpportunity;
   final VoidCallback onOpenProfile;
 
@@ -1561,9 +2600,14 @@ class AppHeader extends StatelessWidget {
             Align(
               alignment: Alignment.centerRight,
               child: IconButton.filledTonal(
-                tooltip: 'Nueva oportunidad',
+                tooltip:
+                    managerMode ? 'Asignar oportunidad' : 'Nueva oportunidad',
                 onPressed: onNewOpportunity,
-                icon: const Icon(Icons.add_business_outlined),
+                icon: Icon(
+                  managerMode
+                      ? Icons.person_add_alt_1_outlined
+                      : Icons.add_business_outlined,
+                ),
               ),
             ),
           ],
@@ -4782,6 +5826,7 @@ class KonfiApiClient {
   Map<String, Object?> _opportunityPayload(
     OpportunityDraft draft,
     String ownerId,
+    String source,
   ) {
     final nextDate = draft.deadline.isEmpty
         ? DateTime.now().toIso8601String().substring(0, 10)
@@ -4804,7 +5849,7 @@ class KonfiApiClient {
       'status': draft.status,
       'responsible': draft.responsible,
       'ownerId': ownerId,
-      'source': 'App vendedor',
+      'source': source,
       'nextAction':
           draft.strategy.isEmpty ? 'Seguimiento comercial' : draft.strategy,
       'nextDate': nextDate,
@@ -4822,11 +5867,12 @@ class KonfiApiClient {
     OpportunityDraft draft,
     String ownerId, {
     SalesStore? previous,
+    String source = 'App vendedor',
   }) async {
     final response = await http.post(
       _uri('/opportunities'),
       headers: const {'Content-Type': 'application/json'},
-      body: jsonEncode(_opportunityPayload(draft, ownerId)),
+      body: jsonEncode(_opportunityPayload(draft, ownerId, source)),
     );
     return _decodeStore(response, previous: previous);
   }
@@ -4840,7 +5886,7 @@ class KonfiApiClient {
     final response = await http.patch(
       _uri('/opportunities/$opportunityId'),
       headers: const {'Content-Type': 'application/json'},
-      body: jsonEncode(_opportunityPayload(draft, ownerId)),
+      body: jsonEncode(_opportunityPayload(draft, ownerId, 'App vendedor')),
     );
     return _decodeStore(response, previous: previous);
   }
@@ -5213,6 +6259,9 @@ class SalesStore {
     final gestiones = _list(json['gestiones'])
         .map((item) => GestionRecord.fromJson(_map(item), stages))
         .toList();
+    final sessionUser = _map(json['sessionUser']);
+    final sessionRole = _text(sessionUser['role']);
+    final managerSession = {'gerencias', 'jefaturas'}.contains(sessionRole);
 
     SalesUser pickSeller() {
       final activeUserId = _text(json['activeUserId']);
@@ -5226,24 +6275,32 @@ class SalesStore {
     }
 
     final crmSeller = pickSeller();
-    final sessionUser = _map(json['sessionUser']);
     final sessionName = _text(sessionUser['name']);
-    final currentSeller = sessionName.isEmpty
-        ? crmSeller
-        : SalesUser(
-            id: crmSeller.id,
-            name: sessionName,
-            initials: SalesUser.initialsFromName(sessionName),
-            firstName:
-                _text(sessionUser['firstName'], sessionName.split(' ').first),
-            lastName: _text(sessionUser['lastName']),
-            dui: crmSeller.dui,
-            address: crmSeller.address,
-            roleId: crmSeller.roleId,
-            phone: crmSeller.phone,
-            email: _text(sessionUser['email'], crmSeller.email),
-            territory: crmSeller.territory,
-          );
+    final currentSeller = managerSession
+        ? SalesUser.fromJson({
+            'id': _text(sessionUser['id'], 'manager'),
+            'name': _text(sessionUser['name'], 'Gerencia comercial'),
+            'email': _text(sessionUser['email']),
+            'username': _text(sessionUser['username']),
+            'roleId': 'sales_manager',
+            'territory': 'Vista general',
+          })
+        : sessionName.isEmpty
+            ? crmSeller
+            : SalesUser(
+                id: crmSeller.id,
+                name: sessionName,
+                initials: SalesUser.initialsFromName(sessionName),
+                firstName: _text(
+                    sessionUser['firstName'], sessionName.split(' ').first),
+                lastName: _text(sessionUser['lastName']),
+                dui: crmSeller.dui,
+                address: crmSeller.address,
+                roleId: crmSeller.roleId,
+                phone: crmSeller.phone,
+                email: _text(sessionUser['email'], crmSeller.email),
+                territory: crmSeller.territory,
+              );
 
     return SalesStore(
       currentSeller: currentSeller,
@@ -5526,6 +6583,9 @@ class SalesUser {
   final String phone;
   final String email;
   final String territory;
+
+  bool get isManager =>
+      {'sales_manager', 'gerencias', 'jefaturas'}.contains(roleId);
 
   factory SalesUser.fromJson(Map<String, dynamic> json) {
     final name = _text(json['name'], 'Vendedor');
