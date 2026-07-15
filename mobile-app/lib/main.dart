@@ -4,6 +4,7 @@ import 'dart:math' as math;
 import 'dart:ui';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:http/http.dart' as http;
 
 const apiBaseUrl = String.fromEnvironment(
@@ -16,6 +17,47 @@ const apiPathPrefix = String.fromEnvironment(
 );
 const previewUsername = String.fromEnvironment('PREVIEW_USERNAME');
 const previewPassword = String.fromEnvironment('PREVIEW_PASSWORD');
+
+class SessionStorage {
+  static const _channel = MethodChannel('com.kmi.ventas/session');
+
+  static Future<SalesUser?> read() async {
+    try {
+      final raw = await _channel.invokeMethod<String>('read');
+      if (raw == null || raw.isEmpty) return null;
+      return SalesUser.fromJson(
+        Map<String, dynamic>.from(jsonDecode(raw) as Map),
+      );
+    } on PlatformException {
+      return null;
+    } on MissingPluginException {
+      return null;
+    } on FormatException {
+      await clear();
+      return null;
+    }
+  }
+
+  static Future<void> write(SalesUser user) async {
+    try {
+      await _channel.invokeMethod<void>('write', jsonEncode(user.toJson()));
+    } on PlatformException {
+      // La app sigue operativa aunque el almacenamiento nativo no responda.
+    } on MissingPluginException {
+      // Permite ejecutar las pruebas y la vista web sin el canal Android.
+    }
+  }
+
+  static Future<void> clear() async {
+    try {
+      await _channel.invokeMethod<void>('clear');
+    } on PlatformException {
+      // No bloquea el cierre visual de sesion.
+    } on MissingPluginException {
+      // Permite ejecutar las pruebas y la vista web sin el canal Android.
+    }
+  }
+}
 
 void main() {
   runApp(const KonfiSalesApp());
@@ -99,20 +141,27 @@ class _SalesShellState extends State<SalesShell> {
 
   Future<void> loadInitialSession() async {
     if (previewUsername.isEmpty || previewPassword.isEmpty) {
+      final restoredSeller = await SessionStorage.read();
+      if (restoredSeller != null && mounted) {
+        setState(() => registeredSeller = restoredSeller);
+      }
       await loadStore();
+      if (restoredSeller != null && mounted) {
+        _activateAssignmentMonitoring(
+          (store ?? SalesStore.seed()).withSeller(restoredSeller),
+        );
+      }
       return;
     }
 
     try {
       final loaded = await api.login(
-        const LoginDraft(
-          username: previewUsername,
-          password: previewPassword,
-        ),
+        const LoginDraft(username: previewUsername, password: previewPassword),
         previous: store,
       );
       if (!mounted) return;
       final loggedSeller = loaded.currentSeller;
+      await SessionStorage.write(loggedSeller);
       setState(() {
         registeredSeller = loggedSeller;
         store = loaded.withSeller(loggedSeller);
@@ -262,12 +311,12 @@ class _SalesShellState extends State<SalesShell> {
           : loaded.withSeller(registeredSeller!);
       final newAssignments = assignmentBaselineReady
           ? nextStore.myOpportunities
-              .where(
-                (item) =>
-                    !knownAssignmentIds.contains(item.id) &&
-                    item.source != 'App vendedor',
-              )
-              .toList()
+                .where(
+                  (item) =>
+                      !knownAssignmentIds.contains(item.id) &&
+                      item.source != 'App vendedor',
+                )
+                .toList()
           : <Opportunity>[];
       setState(() {
         store = nextStore;
@@ -296,6 +345,7 @@ class _SalesShellState extends State<SalesShell> {
       store = activeStore.withSeller(seller);
       tabIndex = 0;
     });
+    unawaited(SessionStorage.write(seller));
     _activateAssignmentMonitoring(activeStore.withSeller(seller));
   }
 
@@ -305,6 +355,7 @@ class _SalesShellState extends State<SalesShell> {
       final loaded = await api.createSeller(draft, previous: current);
       final created = loaded.currentSeller;
       if (!mounted) return;
+      await SessionStorage.write(created);
       setState(() {
         registeredSeller = created;
         store = loaded.withSeller(created);
@@ -332,6 +383,7 @@ class _SalesShellState extends State<SalesShell> {
       final loaded = await api.login(draft, previous: current);
       final loggedSeller = loaded.currentSeller;
       if (!mounted) return;
+      await SessionStorage.write(loggedSeller);
       setState(() {
         registeredSeller = loggedSeller;
         store = loaded.withSeller(loggedSeller);
@@ -352,6 +404,7 @@ class _SalesShellState extends State<SalesShell> {
   }
 
   void switchSeller() {
+    unawaited(SessionStorage.clear());
     assignmentPoller?.cancel();
     assignmentPoller = null;
     assignmentBaselineReady = false;
@@ -377,12 +430,9 @@ class _SalesShellState extends State<SalesShell> {
       ..addAll(activeStore.myOpportunities.map((item) => item.id));
     unreadAssignmentIds.clear();
     assignmentBaselineReady = true;
-    assignmentPoller ??= Timer.periodic(
-      const Duration(seconds: 12),
-      (_) {
-        if (registeredSeller != null && !loading) unawaited(loadStore());
-      },
-    );
+    assignmentPoller ??= Timer.periodic(const Duration(seconds: 12), (_) {
+      if (registeredSeller != null && !loading) unawaited(loadStore());
+    });
   }
 
   void markAssignmentsRead() {
@@ -501,6 +551,7 @@ class _SalesShellState extends State<SalesShell> {
       );
       final updated = loaded.currentSeller;
       if (!mounted) return;
+      await SessionStorage.write(updated);
       setState(() {
         registeredSeller = updated;
         store = loaded.withSeller(updated);
@@ -521,6 +572,7 @@ class _SalesShellState extends State<SalesShell> {
     try {
       final loaded = await api.deleteSeller(activeSeller.id, previous: store);
       if (!mounted) return;
+      await SessionStorage.clear();
       setState(() {
         registeredSeller = null;
         store = loaded;
@@ -639,12 +691,9 @@ class _SalesShellState extends State<SalesShell> {
           store: activeStore,
           onSelected: (seller) {
             Navigator.pop(context);
-            Future<void>.delayed(
-              const Duration(milliseconds: 180),
-              () {
-                if (mounted) openManagerAssignmentSheet(seller);
-              },
-            );
+            Future<void>.delayed(const Duration(milliseconds: 180), () {
+              if (mounted) openManagerAssignmentSheet(seller);
+            });
           },
         ),
       );
@@ -892,7 +941,10 @@ class SalesBottomNav extends StatelessWidget {
 
   static const managerItems = [
     _SalesNavItem(
-        Icons.space_dashboard_outlined, Icons.space_dashboard, 'Inicio'),
+      Icons.space_dashboard_outlined,
+      Icons.space_dashboard,
+      'Inicio',
+    ),
     _SalesNavItem(Icons.groups_outlined, Icons.groups, 'Equipo'),
     _SalesNavItem(Icons.view_kanban_outlined, Icons.view_kanban, 'Pipeline'),
   ];
@@ -1020,8 +1072,9 @@ class ManagerHomePage extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final active = store.opportunities.where(_isActiveOpportunity).toList();
-    final team =
-        store.sellers.where((item) => item.roleId == 'sales_exec').toList();
+    final team = store.sellers
+        .where((item) => item.roleId == 'sales_exec')
+        .toList();
     final total = active.fold<double>(0, (sum, item) => sum + item.amount);
     final overdue = active.where(_isOverdueOpportunity).length;
     final won = store.opportunities
@@ -1030,7 +1083,8 @@ class ManagerHomePage extends StatelessWidget {
     final lost = store.opportunities
         .where((item) => item.status.toLowerCase() == 'perdida')
         .length;
-    final rankedTeam = [...team]..sort((a, b) {
+    final rankedTeam = [...team]
+      ..sort((a, b) {
         final aTotal = active
             .where((item) => item.ownerId == a.id)
             .fold<double>(0, (sum, item) => sum + item.amount);
@@ -1108,8 +1162,9 @@ class ManagerHomePage extends StatelessWidget {
               separatorBuilder: (context, index) => const SizedBox(width: 10),
               itemBuilder: (context, index) {
                 final stage = store.stages[index];
-                final stageItems =
-                    active.where((item) => item.stageId == stage.id).toList();
+                final stageItems = active
+                    .where((item) => item.stageId == stage.id)
+                    .toList();
                 final stageTotal = stageItems.fold<double>(
                   0,
                   (sum, item) => sum + item.amount,
@@ -1138,8 +1193,9 @@ class ManagerHomePage extends StatelessWidget {
           for (final seller in rankedTeam.take(5))
             ManagerSellerPulse(
               seller: seller,
-              opportunities:
-                  active.where((item) => item.ownerId == seller.id).toList(),
+              opportunities: active
+                  .where((item) => item.ownerId == seller.id)
+                  .toList(),
               maxAmount: total,
             ),
           if (active.isNotEmpty) ...[
@@ -1149,15 +1205,14 @@ class ManagerHomePage extends StatelessWidget {
               title: 'Oportunidades prioritarias',
             ),
             const SizedBox(height: 10),
-            for (final opportunity in ([...active]..sort((a, b) {
-                    final overdueOrder =
-                        (_isOverdueOpportunity(b) ? 1 : 0).compareTo(
-                      _isOverdueOpportunity(a) ? 1 : 0,
-                    );
-                    if (overdueOrder != 0) return overdueOrder;
-                    return b.amount.compareTo(a.amount);
-                  }))
-                .take(4))
+            for (final opportunity
+                in ([...active]..sort((a, b) {
+                      final overdueOrder = (_isOverdueOpportunity(b) ? 1 : 0)
+                          .compareTo(_isOverdueOpportunity(a) ? 1 : 0);
+                      if (overdueOrder != 0) return overdueOrder;
+                      return b.amount.compareTo(a.amount);
+                    }))
+                    .take(4))
               MiniOpportunityTile(
                 opportunity: opportunity,
                 onTap: () => onOpenOpportunity(opportunity.id),
@@ -1220,8 +1275,10 @@ class ManagerHeroCard extends StatelessWidget {
                   color: AppColors.green.withValues(alpha: 0.16),
                   borderRadius: BorderRadius.circular(16),
                 ),
-                child:
-                    const Icon(Icons.insights_rounded, color: AppColors.green),
+                child: const Icon(
+                  Icons.insights_rounded,
+                  color: AppColors.green,
+                ),
               ),
               const SizedBox(width: 12),
               const Expanded(
@@ -1385,8 +1442,10 @@ class ManagerSellerPulse extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final total =
-        opportunities.fold<double>(0, (sum, item) => sum + item.amount);
+    final total = opportunities.fold<double>(
+      0,
+      (sum, item) => sum + item.amount,
+    );
     final progress = maxAmount <= 0 ? 0.0 : (total / maxAmount).clamp(0.0, 1.0);
     return Padding(
       padding: const EdgeInsets.only(bottom: 9),
@@ -1469,9 +1528,9 @@ class _ManagerTeamPageState extends State<ManagerTeamPage> {
           (item) =>
               item.roleId == 'sales_exec' &&
               (query.isEmpty ||
-                  '${item.name} ${item.email}'
-                      .toLowerCase()
-                      .contains(query.toLowerCase())),
+                  '${item.name} ${item.email}'.toLowerCase().contains(
+                    query.toLowerCase(),
+                  )),
         )
         .toList();
 
@@ -1708,8 +1767,9 @@ class ManagerPipelinePage extends StatelessWidget {
         for (final stage in store.stages)
           StageLane(
             stage: stage,
-            opportunities:
-                active.where((item) => item.stageId == stage.id).toList(),
+            opportunities: active
+                .where((item) => item.stageId == stage.id)
+                .toList(),
             onOpenOpportunity: onOpenOpportunity,
           ),
       ],
@@ -1799,8 +1859,9 @@ class ManagerSellerPickerSheet extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final sellers =
-        store.sellers.where((item) => item.roleId == 'sales_exec').toList();
+    final sellers = store.sellers
+        .where((item) => item.roleId == 'sales_exec')
+        .toList();
     return SheetShell(
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -1894,11 +1955,8 @@ class ManagerProfileSheet extends StatelessWidget {
   }
 }
 
-bool _isActiveOpportunity(Opportunity item) => !{
-      'ganada',
-      'perdida',
-      'cancelada',
-    }.contains(item.status.toLowerCase());
+bool _isActiveOpportunity(Opportunity item) =>
+    !{'ganada', 'perdida', 'cancelada'}.contains(item.status.toLowerCase());
 
 bool _isOverdueOpportunity(Opportunity item) {
   if (!_isActiveOpportunity(item) || item.deadline.isEmpty) return false;
@@ -1985,11 +2043,10 @@ class _SellerRegistrationPageState extends State<SellerRegistrationPage>
       parent: introController,
       curve: const Interval(0, 0.82, curve: Curves.easeOutCubic),
     );
-    introSlide = Tween<Offset>(
-      begin: const Offset(0, 0.08),
-      end: Offset.zero,
-    ).animate(
-        CurvedAnimation(parent: introController, curve: Curves.easeOutCubic));
+    introSlide = Tween<Offset>(begin: const Offset(0, 0.08), end: Offset.zero)
+        .animate(
+          CurvedAnimation(parent: introController, curve: Curves.easeOutCubic),
+        );
     firstNameController.addListener(() => setState(() {}));
     lastNameController.addListener(() => setState(() {}));
   }
@@ -2044,22 +2101,24 @@ class _SellerRegistrationPageState extends State<SellerRegistrationPage>
                       const SizedBox(height: 28),
                       _AuthGlassSurface(
                         child: Theme(
-                          data: Theme.of(context).copyWith(
-                            inputDecorationTheme: _authInputTheme(),
-                          ),
+                          data: Theme.of(
+                            context,
+                          ).copyWith(inputDecorationTheme: _authInputTheme()),
                           child: AnimatedSwitcher(
                             duration: const Duration(milliseconds: 360),
                             switchInCurve: Curves.easeOutCubic,
                             switchOutCurve: Curves.easeInCubic,
                             transitionBuilder: (child, animation) =>
                                 FadeTransition(
-                              opacity: animation,
-                              child: ScaleTransition(
-                                scale: Tween<double>(begin: 0.975, end: 1)
-                                    .animate(animation),
-                                child: child,
-                              ),
-                            ),
+                                  opacity: animation,
+                                  child: ScaleTransition(
+                                    scale: Tween<double>(
+                                      begin: 0.975,
+                                      end: 1,
+                                    ).animate(animation),
+                                    child: child,
+                                  ),
+                                ),
                             child: KeyedSubtree(
                               key: ValueKey(registerMode),
                               child: registerMode
@@ -2074,7 +2133,7 @@ class _SellerRegistrationPageState extends State<SellerRegistrationPage>
                         onPressed: saving
                             ? null
                             : () =>
-                                setState(() => registerMode = !registerMode),
+                                  setState(() => registerMode = !registerMode),
                         style: TextButton.styleFrom(
                           foregroundColor: AppColors.green,
                           padding: const EdgeInsets.symmetric(
@@ -2600,8 +2659,9 @@ class AppHeader extends StatelessWidget {
             Align(
               alignment: Alignment.centerRight,
               child: IconButton.filledTonal(
-                tooltip:
-                    managerMode ? 'Asignar oportunidad' : 'Nueva oportunidad',
+                tooltip: managerMode
+                    ? 'Asignar oportunidad'
+                    : 'Nueva oportunidad',
                 onPressed: onNewOpportunity,
                 icon: Icon(
                   managerMode
@@ -2705,16 +2765,20 @@ class _OpportunitiesPageState extends State<OpportunitiesPage> {
       0,
       (sum, opportunity) => sum + opportunity.amount,
     );
-    final visibleOpportunities = opportunities
-        .where(
-          (opportunity) =>
-              selectedStageId == null || opportunity.stageId == selectedStageId,
-        )
-        .toList()
-      ..sort((a, b) {
-        final stageOrder = a.stageId.compareTo(b.stageId);
-        return stageOrder != 0 ? stageOrder : a.deadline.compareTo(b.deadline);
-      });
+    final visibleOpportunities =
+        opportunities
+            .where(
+              (opportunity) =>
+                  selectedStageId == null ||
+                  opportunity.stageId == selectedStageId,
+            )
+            .toList()
+          ..sort((a, b) {
+            final stageOrder = a.stageId.compareTo(b.stageId);
+            return stageOrder != 0
+                ? stageOrder
+                : a.deadline.compareTo(b.deadline);
+          });
     SalesStage? selectedStage;
     for (final stage in stages) {
       if (stage.id == selectedStageId) selectedStage = stage;
@@ -2764,8 +2828,8 @@ class _OpportunitiesPageState extends State<OpportunitiesPage> {
                 final stageOpportunities = stage == null
                     ? opportunities
                     : opportunities
-                        .where((item) => item.stageId == stage.id)
-                        .toList();
+                          .where((item) => item.stageId == stage.id)
+                          .toList();
                 final stageTotal = stageOpportunities.fold<double>(
                   0,
                   (sum, opportunity) => sum + opportunity.amount,
@@ -3380,7 +3444,7 @@ class AgendaPage extends StatefulWidget {
 
   final SalesStore store;
   final Future<void> Function(String agendaId, VisitStatus status)
-      onStatusChange;
+  onStatusChange;
   final ValueChanged<String> onOpenOpportunity;
   final ValueChanged<int> onCaptureForm;
   final VoidCallback onNewGestion;
@@ -3421,8 +3485,9 @@ class _AgendaPageState extends State<AgendaPage> {
               tooltip: 'Filtrar fecha exacta',
               onPressed: pickExactDate,
               style: IconButton.styleFrom(
-                backgroundColor:
-                    selectedDate == null ? AppColors.green : AppColors.cyan,
+                backgroundColor: selectedDate == null
+                    ? AppColors.green
+                    : AppColors.cyan,
               ),
               icon: const Icon(Icons.calendar_month_outlined),
             ),
@@ -3457,9 +3522,9 @@ class _AgendaPageState extends State<AgendaPage> {
       builder: (context, child) => Theme(
         data: Theme.of(context).copyWith(
           colorScheme: Theme.of(context).colorScheme.copyWith(
-                primary: AppColors.green,
-                surface: AppColors.surface,
-              ),
+            primary: AppColors.green,
+            surface: AppColors.surface,
+          ),
         ),
         child: child ?? const SizedBox.shrink(),
       ),
@@ -3566,8 +3631,9 @@ class FilterBar extends StatelessWidget {
                   foregroundColor: selected == value
                       ? const Color(0xFF04100F)
                       : AppColors.muted,
-                  backgroundColor:
-                      selected == value ? AppColors.green : Colors.transparent,
+                  backgroundColor: selected == value
+                      ? AppColors.green
+                      : Colors.transparent,
                   shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(12),
                   ),
@@ -3598,7 +3664,7 @@ class AgendaTimeline extends StatelessWidget {
   final SalesStore store;
   final ValueChanged<String> onOpenOpportunity;
   final Future<void> Function(String agendaId, VisitStatus status)
-      onStatusChange;
+  onStatusChange;
   final ValueChanged<int> onCaptureForm;
 
   @override
@@ -3723,7 +3789,7 @@ class _ScheduleRow extends StatelessWidget {
   final Opportunity? opportunity;
   final ValueChanged<String> onOpenOpportunity;
   final Future<void> Function(String agendaId, VisitStatus status)
-      onStatusChange;
+  onStatusChange;
   final ValueChanged<int> onCaptureForm;
 
   @override
@@ -3853,7 +3919,7 @@ class _TaskContent extends StatelessWidget {
   final AgendaItem item;
   final Opportunity opportunity;
   final Future<void> Function(String agendaId, VisitStatus status)
-      onStatusChange;
+  onStatusChange;
   final ValueChanged<int> onCaptureForm;
 
   @override
@@ -4390,7 +4456,7 @@ class OpportunityActionSheet extends StatefulWidget {
   final AgendaItem? agenda;
   final Future<void> Function(OpportunityGestionDraft draft) onSaveGestion;
   final Future<void> Function(String agendaId, VisitStatus status)
-      onStatusChange;
+  onStatusChange;
   final VoidCallback onCaptureForm;
 
   @override
@@ -4509,11 +4575,11 @@ class _OpportunityActionSheetState extends State<OpportunityActionSheet> {
               onPressed: widget.agenda == null
                   ? null
                   : () => unawaited(
-                        widget.onStatusChange(
-                          widget.agenda!.id,
-                          VisitStatus.inVisit,
-                        ),
+                      widget.onStatusChange(
+                        widget.agenda!.id,
+                        VisitStatus.inVisit,
                       ),
+                    ),
               icon: const Icon(Icons.location_on_outlined),
             ),
             const SizedBox(width: 12),
@@ -4522,11 +4588,11 @@ class _OpportunityActionSheetState extends State<OpportunityActionSheet> {
               onPressed: widget.agenda == null
                   ? null
                   : () => unawaited(
-                        widget.onStatusChange(
-                          widget.agenda!.id,
-                          VisitStatus.done,
-                        ),
+                      widget.onStatusChange(
+                        widget.agenda!.id,
+                        VisitStatus.done,
                       ),
+                    ),
               icon: const Icon(Icons.check_circle_outline),
             ),
             const SizedBox(width: 12),
@@ -4549,9 +4615,7 @@ class _OpportunityActionSheetState extends State<OpportunityActionSheet> {
   }
 
   Widget _buildManagements() {
-    final records = widget.store.gestionesForOpportunity(
-      widget.opportunity.id,
-    );
+    final records = widget.store.gestionesForOpportunity(widget.opportunity.id);
     final isClosing = _isClosureStage(managementStageId);
     return Column(
       key: const ValueKey('opportunity-managements'),
@@ -4567,10 +4631,7 @@ class _OpportunityActionSheetState extends State<OpportunityActionSheet> {
         else
           for (final record in records) GestionHistoryCard(record: record),
         const SizedBox(height: 18),
-        const SectionTitle(
-          eyebrow: 'Nuevo registro',
-          title: 'Nueva gestion',
-        ),
+        const SectionTitle(eyebrow: 'Nuevo registro', title: 'Nueva gestion'),
         const SizedBox(height: 12),
         TextField(
           controller: dateController,
@@ -5193,10 +5254,7 @@ class _OpportunityEditorSheetState extends State<OpportunityEditorSheet> {
                       prefixIcon: Icon(Icons.flag_outlined),
                     ),
                     items: const [
-                      DropdownMenuItem(
-                        value: 'ganado',
-                        child: Text('Ganado'),
-                      ),
+                      DropdownMenuItem(value: 'ganado', child: Text('Ganado')),
                       DropdownMenuItem(
                         value: 'perdida',
                         child: Text('Perdida'),
@@ -5290,8 +5348,9 @@ class _OpportunityEditorSheetState extends State<OpportunityEditorSheet> {
   }
 
   void submit() {
-    final savedStatus =
-        _isClosureStage(stageId) ? _statusFromClosureResult() : status;
+    final savedStatus = _isClosureStage(stageId)
+        ? _statusFromClosureResult()
+        : status;
     widget.onSave(
       OpportunityDraft(
         startDate: startDate.text,
@@ -5735,8 +5794,9 @@ class KonfiApiClient {
     final cleanBase = baseUrl.endsWith('/')
         ? baseUrl.substring(0, baseUrl.length - 1)
         : baseUrl;
-    final cleanPrefix =
-        pathPrefix.startsWith('/') ? pathPrefix : '/$pathPrefix';
+    final cleanPrefix = pathPrefix.startsWith('/')
+        ? pathPrefix
+        : '/$pathPrefix';
     final cleanPath = path.startsWith('/') ? path : '/$path';
     return Uri.parse('$cleanBase$cleanPrefix$cleanPath');
   }
@@ -5850,8 +5910,9 @@ class KonfiApiClient {
       'responsible': draft.responsible,
       'ownerId': ownerId,
       'source': source,
-      'nextAction':
-          draft.strategy.isEmpty ? 'Seguimiento comercial' : draft.strategy,
+      'nextAction': draft.strategy.isEmpty
+          ? 'Seguimiento comercial'
+          : draft.strategy,
       'nextDate': nextDate,
       'lastNote': draft.comment,
       'comment': draft.comment,
@@ -6008,9 +6069,9 @@ class SalesStore {
     List<GestionRecord>? gestiones,
     Map<String, List<Map<String, String>>>? formResponses,
     List<VisitResult>? visitResults,
-  })  : gestiones = gestiones ?? [],
-        formResponses = formResponses ?? {},
-        visitResults = visitResults ?? [];
+  }) : gestiones = gestiones ?? [],
+       formResponses = formResponses ?? {},
+       visitResults = visitResults ?? [];
 
   final SalesUser currentSeller;
   final List<SalesUser> sellers;
@@ -6256,9 +6317,9 @@ class SalesStore {
     final forms = _list(
       json['forms'],
     ).map((item) => StageForm.fromJson(_map(item))).toList();
-    final gestiones = _list(json['gestiones'])
-        .map((item) => GestionRecord.fromJson(_map(item), stages))
-        .toList();
+    final gestiones = _list(
+      json['gestiones'],
+    ).map((item) => GestionRecord.fromJson(_map(item), stages)).toList();
     final sessionUser = _map(json['sessionUser']);
     final sessionRole = _text(sessionUser['role']);
     final managerSession = {'gerencias', 'jefaturas'}.contains(sessionRole);
@@ -6286,21 +6347,23 @@ class SalesStore {
             'territory': 'Vista general',
           })
         : sessionName.isEmpty
-            ? crmSeller
-            : SalesUser(
-                id: crmSeller.id,
-                name: sessionName,
-                initials: SalesUser.initialsFromName(sessionName),
-                firstName: _text(
-                    sessionUser['firstName'], sessionName.split(' ').first),
-                lastName: _text(sessionUser['lastName']),
-                dui: crmSeller.dui,
-                address: crmSeller.address,
-                roleId: crmSeller.roleId,
-                phone: crmSeller.phone,
-                email: _text(sessionUser['email'], crmSeller.email),
-                territory: crmSeller.territory,
-              );
+        ? crmSeller
+        : SalesUser(
+            id: crmSeller.id,
+            name: sessionName,
+            initials: SalesUser.initialsFromName(sessionName),
+            firstName: _text(
+              sessionUser['firstName'],
+              sessionName.split(' ').first,
+            ),
+            lastName: _text(sessionUser['lastName']),
+            dui: crmSeller.dui,
+            address: crmSeller.address,
+            roleId: crmSeller.roleId,
+            phone: crmSeller.phone,
+            email: _text(sessionUser['email'], crmSeller.email),
+            territory: crmSeller.territory,
+          );
 
     return SalesStore(
       currentSeller: currentSeller,
@@ -6357,8 +6420,9 @@ class SalesStore {
   SalesStore withUpdatedSeller(SalesUser seller) {
     return SalesStore(
       currentSeller: seller,
-      sellers:
-          sellers.map((item) => item.id == seller.id ? seller : item).toList(),
+      sellers: sellers
+          .map((item) => item.id == seller.id ? seller : item)
+          .toList(),
       stages: stages,
       opportunities: opportunities,
       agenda: agenda,
@@ -6390,16 +6454,17 @@ class SalesStore {
   List<Opportunity> get myOpportunities =>
       opportunities.where((item) => item.ownerId == currentSeller.id).toList();
 
-  List<Opportunity> get myActiveOpportunities => myOpportunities
-      .where(
-        (item) => !{
-          'ganada',
-          'perdida',
-          'cancelada',
-        }.contains(item.status.toLowerCase()),
-      )
-      .toList()
-    ..sort((a, b) => a.deadline.compareTo(b.deadline));
+  List<Opportunity> get myActiveOpportunities =>
+      myOpportunities
+          .where(
+            (item) => !{
+              'ganada',
+              'perdida',
+              'cancelada',
+            }.contains(item.status.toLowerCase()),
+          )
+          .toList()
+        ..sort((a, b) => a.deadline.compareTo(b.deadline));
 
   List<AgendaItem> get myAgenda =>
       agenda.where((item) => item.ownerId == currentSeller.id).toList();
@@ -6458,8 +6523,9 @@ class SalesStore {
   }
 
   List<GestionRecord> gestionesForOpportunity(String opportunityId) {
-    final items =
-        gestiones.where((item) => item.opportunityId == opportunityId).toList();
+    final items = gestiones
+        .where((item) => item.opportunityId == opportunityId)
+        .toList();
     items.sort((a, b) => b.sortKey.compareTo(a.sortKey));
     return items;
   }
@@ -6518,8 +6584,9 @@ class SalesStore {
       status: draft.status,
       responsible: draft.responsible,
       ownerId: currentSeller.id,
-      nextAction:
-          draft.strategy.isEmpty ? 'Seguimiento comercial' : draft.strategy,
+      nextAction: draft.strategy.isEmpty
+          ? 'Seguimiento comercial'
+          : draft.strategy,
       note: draft.comment,
       comment: draft.comment,
     );
@@ -6587,6 +6654,20 @@ class SalesUser {
   bool get isManager =>
       {'sales_manager', 'gerencias', 'jefaturas'}.contains(roleId);
 
+  Map<String, dynamic> toJson() => {
+    'id': id,
+    'name': name,
+    'initials': initials,
+    'firstName': firstName,
+    'lastName': lastName,
+    'dui': dui,
+    'address': address,
+    'roleId': roleId,
+    'phone': phone,
+    'email': email,
+    'territory': territory,
+  };
+
   factory SalesUser.fromJson(Map<String, dynamic> json) {
     final name = _text(json['name'], 'Vendedor');
     final parsedFirstName = _text(json['firstName']);
@@ -6598,8 +6679,9 @@ class SalesUser {
       firstName: parsedFirstName.isEmpty
           ? _firstNameFromFullName(name)
           : parsedFirstName,
-      lastName:
-          parsedLastName.isEmpty ? _lastNameFromFullName(name) : parsedLastName,
+      lastName: parsedLastName.isEmpty
+          ? _lastNameFromFullName(name)
+          : parsedLastName,
       dui: _text(json['dui']),
       address: _text(json['address']),
       roleId: _text(json['roleId'], 'sales_exec'),
