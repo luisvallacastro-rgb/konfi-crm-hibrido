@@ -311,12 +311,12 @@ class _SalesShellState extends State<SalesShell> {
           : loaded.withSeller(registeredSeller!);
       final newAssignments = assignmentBaselineReady
           ? nextStore.myOpportunities
-                .where(
-                  (item) =>
-                      !knownAssignmentIds.contains(item.id) &&
-                      item.source != 'App vendedor',
-                )
-                .toList()
+              .where(
+                (item) =>
+                    !knownAssignmentIds.contains(item.id) &&
+                    item.source != 'App vendedor',
+              )
+              .toList()
           : <Opportunity>[];
       setState(() {
         store = nextStore;
@@ -1072,9 +1072,8 @@ class ManagerHomePage extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final active = store.opportunities.where(_isActiveOpportunity).toList();
-    final team = store.sellers
-        .where((item) => item.roleId == 'sales_exec')
-        .toList();
+    final team =
+        store.sellers.where((item) => item.roleId == 'sales_exec').toList();
     final total = active.fold<double>(0, (sum, item) => sum + item.amount);
     final overdue = active.where(_isOverdueOpportunity).length;
     final won = store.opportunities
@@ -1083,8 +1082,9 @@ class ManagerHomePage extends StatelessWidget {
     final lost = store.opportunities
         .where((item) => item.status.toLowerCase() == 'perdida')
         .length;
-    final rankedTeam = [...team]
-      ..sort((a, b) {
+    final managerialOpportunityCount =
+        store.managerialOpportunityCount ?? active.length;
+    final rankedTeam = [...team]..sort((a, b) {
         final aTotal = active
             .where((item) => item.ownerId == a.id)
             .fold<double>(0, (sum, item) => sum + item.amount);
@@ -1100,8 +1100,9 @@ class ManagerHomePage extends StatelessWidget {
         padding: const EdgeInsets.fromLTRB(16, 8, 16, 112),
         children: [
           ManagerHeroCard(
-            total: total,
-            opportunityCount: active.length,
+            crmTotal: total,
+            managerialOpportunityCount: managerialOpportunityCount,
+            crmOpportunityCount: active.length,
             sellerCount: team.length,
             onAssignOpportunity: onAssignOpportunity,
             onSync: onSync,
@@ -1162,9 +1163,8 @@ class ManagerHomePage extends StatelessWidget {
               separatorBuilder: (context, index) => const SizedBox(width: 10),
               itemBuilder: (context, index) {
                 final stage = store.stages[index];
-                final stageItems = active
-                    .where((item) => item.stageId == stage.id)
-                    .toList();
+                final stageItems =
+                    active.where((item) => item.stageId == stage.id).toList();
                 final stageTotal = stageItems.fold<double>(
                   0,
                   (sum, item) => sum + item.amount,
@@ -1193,9 +1193,8 @@ class ManagerHomePage extends StatelessWidget {
           for (final seller in rankedTeam.take(5))
             ManagerSellerPulse(
               seller: seller,
-              opportunities: active
-                  .where((item) => item.ownerId == seller.id)
-                  .toList(),
+              opportunities:
+                  active.where((item) => item.ownerId == seller.id).toList(),
               maxAmount: total,
             ),
           if (active.isNotEmpty) ...[
@@ -1205,14 +1204,13 @@ class ManagerHomePage extends StatelessWidget {
               title: 'Oportunidades prioritarias',
             ),
             const SizedBox(height: 10),
-            for (final opportunity
-                in ([...active]..sort((a, b) {
-                      final overdueOrder = (_isOverdueOpportunity(b) ? 1 : 0)
-                          .compareTo(_isOverdueOpportunity(a) ? 1 : 0);
-                      if (overdueOrder != 0) return overdueOrder;
-                      return b.amount.compareTo(a.amount);
-                    }))
-                    .take(4))
+            for (final opportunity in ([...active]..sort((a, b) {
+                    final overdueOrder = (_isOverdueOpportunity(b) ? 1 : 0)
+                        .compareTo(_isOverdueOpportunity(a) ? 1 : 0);
+                    if (overdueOrder != 0) return overdueOrder;
+                    return b.amount.compareTo(a.amount);
+                  }))
+                .take(4))
               MiniOpportunityTile(
                 opportunity: opportunity,
                 onTap: () => onOpenOpportunity(opportunity.id),
@@ -1226,16 +1224,18 @@ class ManagerHomePage extends StatelessWidget {
 
 class ManagerHeroCard extends StatelessWidget {
   const ManagerHeroCard({
-    required this.total,
-    required this.opportunityCount,
+    required this.crmTotal,
+    required this.managerialOpportunityCount,
+    required this.crmOpportunityCount,
     required this.sellerCount,
     required this.onAssignOpportunity,
     required this.onSync,
     super.key,
   });
 
-  final double total;
-  final int opportunityCount;
+  final double crmTotal;
+  final int managerialOpportunityCount;
+  final int crmOpportunityCount;
   final int sellerCount;
   final VoidCallback onAssignOpportunity;
   final Future<void> Function() onSync;
@@ -1283,7 +1283,7 @@ class ManagerHeroCard extends StatelessWidget {
               const SizedBox(width: 12),
               const Expanded(
                 child: Text(
-                  'PIPELINE DEL EQUIPO',
+                  'OPORTUNIDADES GERENCIALES',
                   style: TextStyle(
                     color: AppColors.green,
                     fontWeight: FontWeight.w900,
@@ -1300,19 +1300,50 @@ class ManagerHeroCard extends StatelessWidget {
           ),
           const SizedBox(height: 16),
           Text(
-            _currency(total),
+            '$managerialOpportunityCount',
             style: const TextStyle(
               color: AppColors.ink,
-              fontSize: 36,
+              fontSize: 48,
               fontWeight: FontWeight.w900,
-              letterSpacing: -1.4,
+              letterSpacing: -1.8,
+              height: 1,
             ),
           ),
-          const SizedBox(height: 5),
+          const SizedBox(height: 6),
+          const Text(
+            'Cantidad activa en Oportunidades / Gerencia',
+            style: TextStyle(
+              color: AppColors.muted,
+              fontSize: 12.5,
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+          const SizedBox(height: 14),
+          const Text(
+            'TOTAL CRM',
+            style: TextStyle(
+              color: AppColors.green,
+              fontSize: 10.5,
+              fontWeight: FontWeight.w900,
+              letterSpacing: 1.1,
+            ),
+          ),
+          const SizedBox(height: 2),
           Text(
-            '$opportunityCount oportunidades activas · $sellerCount vendedores',
+            _currency(crmTotal),
+            style: const TextStyle(
+              color: AppColors.ink,
+              fontSize: 22,
+              fontWeight: FontWeight.w900,
+              letterSpacing: -0.6,
+            ),
+          ),
+          const SizedBox(height: 3),
+          Text(
+            '$crmOpportunityCount oportunidades activas · $sellerCount vendedores',
             style: const TextStyle(
               color: AppColors.muted,
+              fontSize: 12,
               fontWeight: FontWeight.w700,
             ),
           ),
@@ -1529,8 +1560,8 @@ class _ManagerTeamPageState extends State<ManagerTeamPage> {
               item.roleId == 'sales_exec' &&
               (query.isEmpty ||
                   '${item.name} ${item.email}'.toLowerCase().contains(
-                    query.toLowerCase(),
-                  )),
+                        query.toLowerCase(),
+                      )),
         )
         .toList();
 
@@ -1767,9 +1798,8 @@ class ManagerPipelinePage extends StatelessWidget {
         for (final stage in store.stages)
           StageLane(
             stage: stage,
-            opportunities: active
-                .where((item) => item.stageId == stage.id)
-                .toList(),
+            opportunities:
+                active.where((item) => item.stageId == stage.id).toList(),
             onOpenOpportunity: onOpenOpportunity,
           ),
       ],
@@ -1859,9 +1889,8 @@ class ManagerSellerPickerSheet extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final sellers = store.sellers
-        .where((item) => item.roleId == 'sales_exec')
-        .toList();
+    final sellers =
+        store.sellers.where((item) => item.roleId == 'sales_exec').toList();
     return SheetShell(
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -2043,10 +2072,10 @@ class _SellerRegistrationPageState extends State<SellerRegistrationPage>
       parent: introController,
       curve: const Interval(0, 0.82, curve: Curves.easeOutCubic),
     );
-    introSlide = Tween<Offset>(begin: const Offset(0, 0.08), end: Offset.zero)
-        .animate(
-          CurvedAnimation(parent: introController, curve: Curves.easeOutCubic),
-        );
+    introSlide =
+        Tween<Offset>(begin: const Offset(0, 0.08), end: Offset.zero).animate(
+      CurvedAnimation(parent: introController, curve: Curves.easeOutCubic),
+    );
     firstNameController.addListener(() => setState(() {}));
     lastNameController.addListener(() => setState(() {}));
   }
@@ -2110,15 +2139,15 @@ class _SellerRegistrationPageState extends State<SellerRegistrationPage>
                             switchOutCurve: Curves.easeInCubic,
                             transitionBuilder: (child, animation) =>
                                 FadeTransition(
-                                  opacity: animation,
-                                  child: ScaleTransition(
-                                    scale: Tween<double>(
-                                      begin: 0.975,
-                                      end: 1,
-                                    ).animate(animation),
-                                    child: child,
-                                  ),
-                                ),
+                              opacity: animation,
+                              child: ScaleTransition(
+                                scale: Tween<double>(
+                                  begin: 0.975,
+                                  end: 1,
+                                ).animate(animation),
+                                child: child,
+                              ),
+                            ),
                             child: KeyedSubtree(
                               key: ValueKey(registerMode),
                               child: registerMode
@@ -2133,7 +2162,7 @@ class _SellerRegistrationPageState extends State<SellerRegistrationPage>
                         onPressed: saving
                             ? null
                             : () =>
-                                  setState(() => registerMode = !registerMode),
+                                setState(() => registerMode = !registerMode),
                         style: TextButton.styleFrom(
                           foregroundColor: AppColors.green,
                           padding: const EdgeInsets.symmetric(
@@ -2659,9 +2688,8 @@ class AppHeader extends StatelessWidget {
             Align(
               alignment: Alignment.centerRight,
               child: IconButton.filledTonal(
-                tooltip: managerMode
-                    ? 'Asignar oportunidad'
-                    : 'Nueva oportunidad',
+                tooltip:
+                    managerMode ? 'Asignar oportunidad' : 'Nueva oportunidad',
                 onPressed: onNewOpportunity,
                 icon: Icon(
                   managerMode
@@ -2765,20 +2793,16 @@ class _OpportunitiesPageState extends State<OpportunitiesPage> {
       0,
       (sum, opportunity) => sum + opportunity.amount,
     );
-    final visibleOpportunities =
-        opportunities
-            .where(
-              (opportunity) =>
-                  selectedStageId == null ||
-                  opportunity.stageId == selectedStageId,
-            )
-            .toList()
-          ..sort((a, b) {
-            final stageOrder = a.stageId.compareTo(b.stageId);
-            return stageOrder != 0
-                ? stageOrder
-                : a.deadline.compareTo(b.deadline);
-          });
+    final visibleOpportunities = opportunities
+        .where(
+          (opportunity) =>
+              selectedStageId == null || opportunity.stageId == selectedStageId,
+        )
+        .toList()
+      ..sort((a, b) {
+        final stageOrder = a.stageId.compareTo(b.stageId);
+        return stageOrder != 0 ? stageOrder : a.deadline.compareTo(b.deadline);
+      });
     SalesStage? selectedStage;
     for (final stage in stages) {
       if (stage.id == selectedStageId) selectedStage = stage;
@@ -2828,8 +2852,8 @@ class _OpportunitiesPageState extends State<OpportunitiesPage> {
                 final stageOpportunities = stage == null
                     ? opportunities
                     : opportunities
-                          .where((item) => item.stageId == stage.id)
-                          .toList();
+                        .where((item) => item.stageId == stage.id)
+                        .toList();
                 final stageTotal = stageOpportunities.fold<double>(
                   0,
                   (sum, opportunity) => sum + opportunity.amount,
@@ -3444,7 +3468,7 @@ class AgendaPage extends StatefulWidget {
 
   final SalesStore store;
   final Future<void> Function(String agendaId, VisitStatus status)
-  onStatusChange;
+      onStatusChange;
   final ValueChanged<String> onOpenOpportunity;
   final ValueChanged<int> onCaptureForm;
   final VoidCallback onNewGestion;
@@ -3485,9 +3509,8 @@ class _AgendaPageState extends State<AgendaPage> {
               tooltip: 'Filtrar fecha exacta',
               onPressed: pickExactDate,
               style: IconButton.styleFrom(
-                backgroundColor: selectedDate == null
-                    ? AppColors.green
-                    : AppColors.cyan,
+                backgroundColor:
+                    selectedDate == null ? AppColors.green : AppColors.cyan,
               ),
               icon: const Icon(Icons.calendar_month_outlined),
             ),
@@ -3522,9 +3545,9 @@ class _AgendaPageState extends State<AgendaPage> {
       builder: (context, child) => Theme(
         data: Theme.of(context).copyWith(
           colorScheme: Theme.of(context).colorScheme.copyWith(
-            primary: AppColors.green,
-            surface: AppColors.surface,
-          ),
+                primary: AppColors.green,
+                surface: AppColors.surface,
+              ),
         ),
         child: child ?? const SizedBox.shrink(),
       ),
@@ -3631,9 +3654,8 @@ class FilterBar extends StatelessWidget {
                   foregroundColor: selected == value
                       ? const Color(0xFF04100F)
                       : AppColors.muted,
-                  backgroundColor: selected == value
-                      ? AppColors.green
-                      : Colors.transparent,
+                  backgroundColor:
+                      selected == value ? AppColors.green : Colors.transparent,
                   shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(12),
                   ),
@@ -3664,7 +3686,7 @@ class AgendaTimeline extends StatelessWidget {
   final SalesStore store;
   final ValueChanged<String> onOpenOpportunity;
   final Future<void> Function(String agendaId, VisitStatus status)
-  onStatusChange;
+      onStatusChange;
   final ValueChanged<int> onCaptureForm;
 
   @override
@@ -3789,7 +3811,7 @@ class _ScheduleRow extends StatelessWidget {
   final Opportunity? opportunity;
   final ValueChanged<String> onOpenOpportunity;
   final Future<void> Function(String agendaId, VisitStatus status)
-  onStatusChange;
+      onStatusChange;
   final ValueChanged<int> onCaptureForm;
 
   @override
@@ -3919,7 +3941,7 @@ class _TaskContent extends StatelessWidget {
   final AgendaItem item;
   final Opportunity opportunity;
   final Future<void> Function(String agendaId, VisitStatus status)
-  onStatusChange;
+      onStatusChange;
   final ValueChanged<int> onCaptureForm;
 
   @override
@@ -4456,7 +4478,7 @@ class OpportunityActionSheet extends StatefulWidget {
   final AgendaItem? agenda;
   final Future<void> Function(OpportunityGestionDraft draft) onSaveGestion;
   final Future<void> Function(String agendaId, VisitStatus status)
-  onStatusChange;
+      onStatusChange;
   final VoidCallback onCaptureForm;
 
   @override
@@ -4575,11 +4597,11 @@ class _OpportunityActionSheetState extends State<OpportunityActionSheet> {
               onPressed: widget.agenda == null
                   ? null
                   : () => unawaited(
-                      widget.onStatusChange(
-                        widget.agenda!.id,
-                        VisitStatus.inVisit,
+                        widget.onStatusChange(
+                          widget.agenda!.id,
+                          VisitStatus.inVisit,
+                        ),
                       ),
-                    ),
               icon: const Icon(Icons.location_on_outlined),
             ),
             const SizedBox(width: 12),
@@ -4588,11 +4610,11 @@ class _OpportunityActionSheetState extends State<OpportunityActionSheet> {
               onPressed: widget.agenda == null
                   ? null
                   : () => unawaited(
-                      widget.onStatusChange(
-                        widget.agenda!.id,
-                        VisitStatus.done,
+                        widget.onStatusChange(
+                          widget.agenda!.id,
+                          VisitStatus.done,
+                        ),
                       ),
-                    ),
               icon: const Icon(Icons.check_circle_outline),
             ),
             const SizedBox(width: 12),
@@ -5348,9 +5370,8 @@ class _OpportunityEditorSheetState extends State<OpportunityEditorSheet> {
   }
 
   void submit() {
-    final savedStatus = _isClosureStage(stageId)
-        ? _statusFromClosureResult()
-        : status;
+    final savedStatus =
+        _isClosureStage(stageId) ? _statusFromClosureResult() : status;
     widget.onSave(
       OpportunityDraft(
         startDate: startDate.text,
@@ -5794,11 +5815,18 @@ class KonfiApiClient {
     final cleanBase = baseUrl.endsWith('/')
         ? baseUrl.substring(0, baseUrl.length - 1)
         : baseUrl;
-    final cleanPrefix = pathPrefix.startsWith('/')
-        ? pathPrefix
-        : '/$pathPrefix';
+    final cleanPrefix =
+        pathPrefix.startsWith('/') ? pathPrefix : '/$pathPrefix';
     final cleanPath = path.startsWith('/') ? path : '/$path';
     return Uri.parse('$cleanBase$cleanPrefix$cleanPath');
+  }
+
+  Uri _systemUri(String path) {
+    final cleanBase = baseUrl.endsWith('/')
+        ? baseUrl.substring(0, baseUrl.length - 1)
+        : baseUrl;
+    final cleanPath = path.startsWith('/') ? path : '/$path';
+    return Uri.parse('$cleanBase$cleanPath');
   }
 
   Future<SalesStore> loadStore({SalesStore? previous}) async {
@@ -5910,9 +5938,8 @@ class KonfiApiClient {
       'responsible': draft.responsible,
       'ownerId': ownerId,
       'source': source,
-      'nextAction': draft.strategy.isEmpty
-          ? 'Seguimiento comercial'
-          : draft.strategy,
+      'nextAction':
+          draft.strategy.isEmpty ? 'Seguimiento comercial' : draft.strategy,
       'nextDate': nextDate,
       'lastNote': draft.comment,
       'comment': draft.comment,
@@ -6017,12 +6044,56 @@ class KonfiApiClient {
     return _decodeStore(response, previous: previous);
   }
 
-  SalesStore _decodeStore(http.Response response, {SalesStore? previous}) {
+  Future<SalesStore> _decodeStore(
+    http.Response response, {
+    SalesStore? previous,
+  }) async {
     if (response.statusCode < 200 || response.statusCode >= 300) {
       throw StateError('API ${response.statusCode}: ${response.body}');
     }
     final payload = jsonDecode(response.body) as Map<String, dynamic>;
+    final sessionRole = _text(_map(payload['sessionUser'])['role']);
+    final isManagerSession = {'gerencias', 'jefaturas'}.contains(sessionRole) ||
+        (previous?.currentSeller.isManager ?? false);
+    if (isManagerSession) {
+      try {
+        final managementResponse = await http.get(
+          _systemUri('/api/opportunities'),
+        );
+        if (managementResponse.statusCode >= 200 &&
+            managementResponse.statusCode < 300) {
+          final managementPayload = jsonDecode(managementResponse.body);
+          payload['managerialOpportunityCount'] =
+              _visibleManagerialOpportunityCount(managementPayload);
+        }
+      } catch (_) {
+        // La vista conserva el ultimo conteo si el resumen gerencial no responde.
+      }
+    }
+    payload['managerialOpportunityCount'] ??=
+        previous?.managerialOpportunityCount;
     return SalesStore.fromApi(payload, previous: previous);
+  }
+
+  int _visibleManagerialOpportunityCount(Object? value) {
+    if (value is! List) return 0;
+    return value.where((rawItem) {
+      final item = _map(rawItem);
+      final managements = _list(item['managements']);
+      Map<String, dynamic>? latestClosure;
+      for (final rawManagement in managements.reversed) {
+        final management = _map(rawManagement);
+        final stage = _text(management['stage']).toLowerCase();
+        final result = _text(management['result']).toLowerCase();
+        if (management['canceled'] != true &&
+            {'cierre', 'cierre de ventas'}.contains(stage) &&
+            result.isNotEmpty) {
+          latestClosure = management;
+          break;
+        }
+      }
+      return _text(latestClosure?['result']).toLowerCase() != 'perdida';
+    }).length;
   }
 }
 
@@ -6066,12 +6137,13 @@ class SalesStore {
     required this.opportunities,
     required this.agenda,
     required this.forms,
+    this.managerialOpportunityCount,
     List<GestionRecord>? gestiones,
     Map<String, List<Map<String, String>>>? formResponses,
     List<VisitResult>? visitResults,
-  }) : gestiones = gestiones ?? [],
-       formResponses = formResponses ?? {},
-       visitResults = visitResults ?? [];
+  })  : gestiones = gestiones ?? [],
+        formResponses = formResponses ?? {},
+        visitResults = visitResults ?? [];
 
   final SalesUser currentSeller;
   final List<SalesUser> sellers;
@@ -6079,6 +6151,7 @@ class SalesStore {
   final List<Opportunity> opportunities;
   final List<AgendaItem> agenda;
   final List<StageForm> forms;
+  final int? managerialOpportunityCount;
   final List<GestionRecord> gestiones;
   final Map<String, List<Map<String, String>>> formResponses;
   final List<VisitResult> visitResults;
@@ -6347,23 +6420,23 @@ class SalesStore {
             'territory': 'Vista general',
           })
         : sessionName.isEmpty
-        ? crmSeller
-        : SalesUser(
-            id: crmSeller.id,
-            name: sessionName,
-            initials: SalesUser.initialsFromName(sessionName),
-            firstName: _text(
-              sessionUser['firstName'],
-              sessionName.split(' ').first,
-            ),
-            lastName: _text(sessionUser['lastName']),
-            dui: crmSeller.dui,
-            address: crmSeller.address,
-            roleId: crmSeller.roleId,
-            phone: crmSeller.phone,
-            email: _text(sessionUser['email'], crmSeller.email),
-            territory: crmSeller.territory,
-          );
+            ? crmSeller
+            : SalesUser(
+                id: crmSeller.id,
+                name: sessionName,
+                initials: SalesUser.initialsFromName(sessionName),
+                firstName: _text(
+                  sessionUser['firstName'],
+                  sessionName.split(' ').first,
+                ),
+                lastName: _text(sessionUser['lastName']),
+                dui: crmSeller.dui,
+                address: crmSeller.address,
+                roleId: crmSeller.roleId,
+                phone: crmSeller.phone,
+                email: _text(sessionUser['email'], crmSeller.email),
+                territory: crmSeller.territory,
+              );
 
     return SalesStore(
       currentSeller: currentSeller,
@@ -6372,6 +6445,9 @@ class SalesStore {
       opportunities: opportunities,
       agenda: agenda,
       forms: forms.isNotEmpty ? forms : SalesStore.seed().forms,
+      managerialOpportunityCount: json['managerialOpportunityCount'] == null
+          ? previous?.managerialOpportunityCount
+          : _int(json['managerialOpportunityCount']),
       gestiones: gestiones,
       formResponses: previous == null
           ? {}
@@ -6393,6 +6469,7 @@ class SalesStore {
       opportunities: opportunities,
       agenda: agenda,
       forms: forms,
+      managerialOpportunityCount: managerialOpportunityCount,
       gestiones: gestiones,
       formResponses: formResponses,
       visitResults: visitResults,
@@ -6411,6 +6488,7 @@ class SalesStore {
       opportunities: opportunities,
       agenda: agenda,
       forms: forms,
+      managerialOpportunityCount: managerialOpportunityCount,
       gestiones: gestiones,
       formResponses: formResponses,
       visitResults: visitResults,
@@ -6420,13 +6498,13 @@ class SalesStore {
   SalesStore withUpdatedSeller(SalesUser seller) {
     return SalesStore(
       currentSeller: seller,
-      sellers: sellers
-          .map((item) => item.id == seller.id ? seller : item)
-          .toList(),
+      sellers:
+          sellers.map((item) => item.id == seller.id ? seller : item).toList(),
       stages: stages,
       opportunities: opportunities,
       agenda: agenda,
       forms: forms,
+      managerialOpportunityCount: managerialOpportunityCount,
       gestiones: gestiones,
       formResponses: formResponses,
       visitResults: visitResults,
@@ -6445,6 +6523,7 @@ class SalesStore {
       opportunities: opportunities,
       agenda: agenda,
       forms: forms,
+      managerialOpportunityCount: managerialOpportunityCount,
       gestiones: gestiones,
       formResponses: formResponses,
       visitResults: visitResults,
@@ -6454,17 +6533,16 @@ class SalesStore {
   List<Opportunity> get myOpportunities =>
       opportunities.where((item) => item.ownerId == currentSeller.id).toList();
 
-  List<Opportunity> get myActiveOpportunities =>
-      myOpportunities
-          .where(
-            (item) => !{
-              'ganada',
-              'perdida',
-              'cancelada',
-            }.contains(item.status.toLowerCase()),
-          )
-          .toList()
-        ..sort((a, b) => a.deadline.compareTo(b.deadline));
+  List<Opportunity> get myActiveOpportunities => myOpportunities
+      .where(
+        (item) => !{
+          'ganada',
+          'perdida',
+          'cancelada',
+        }.contains(item.status.toLowerCase()),
+      )
+      .toList()
+    ..sort((a, b) => a.deadline.compareTo(b.deadline));
 
   List<AgendaItem> get myAgenda =>
       agenda.where((item) => item.ownerId == currentSeller.id).toList();
@@ -6523,9 +6601,8 @@ class SalesStore {
   }
 
   List<GestionRecord> gestionesForOpportunity(String opportunityId) {
-    final items = gestiones
-        .where((item) => item.opportunityId == opportunityId)
-        .toList();
+    final items =
+        gestiones.where((item) => item.opportunityId == opportunityId).toList();
     items.sort((a, b) => b.sortKey.compareTo(a.sortKey));
     return items;
   }
@@ -6584,9 +6661,8 @@ class SalesStore {
       status: draft.status,
       responsible: draft.responsible,
       ownerId: currentSeller.id,
-      nextAction: draft.strategy.isEmpty
-          ? 'Seguimiento comercial'
-          : draft.strategy,
+      nextAction:
+          draft.strategy.isEmpty ? 'Seguimiento comercial' : draft.strategy,
       note: draft.comment,
       comment: draft.comment,
     );
@@ -6655,18 +6731,18 @@ class SalesUser {
       {'sales_manager', 'gerencias', 'jefaturas'}.contains(roleId);
 
   Map<String, dynamic> toJson() => {
-    'id': id,
-    'name': name,
-    'initials': initials,
-    'firstName': firstName,
-    'lastName': lastName,
-    'dui': dui,
-    'address': address,
-    'roleId': roleId,
-    'phone': phone,
-    'email': email,
-    'territory': territory,
-  };
+        'id': id,
+        'name': name,
+        'initials': initials,
+        'firstName': firstName,
+        'lastName': lastName,
+        'dui': dui,
+        'address': address,
+        'roleId': roleId,
+        'phone': phone,
+        'email': email,
+        'territory': territory,
+      };
 
   factory SalesUser.fromJson(Map<String, dynamic> json) {
     final name = _text(json['name'], 'Vendedor');
@@ -6679,9 +6755,8 @@ class SalesUser {
       firstName: parsedFirstName.isEmpty
           ? _firstNameFromFullName(name)
           : parsedFirstName,
-      lastName: parsedLastName.isEmpty
-          ? _lastNameFromFullName(name)
-          : parsedLastName,
+      lastName:
+          parsedLastName.isEmpty ? _lastNameFromFullName(name) : parsedLastName,
       dui: _text(json['dui']),
       address: _text(json['address']),
       roleId: _text(json['roleId'], 'sales_exec'),
