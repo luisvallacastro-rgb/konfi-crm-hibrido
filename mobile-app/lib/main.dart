@@ -1084,6 +1084,8 @@ class ManagerHomePage extends StatelessWidget {
         .length;
     final managerialOpportunityCount =
         store.managerialOpportunityCount ?? active.length;
+    final managerialOpportunityTotal =
+        store.managerialOpportunityTotal ?? total;
     final rankedTeam = [...team]..sort((a, b) {
         final aTotal = active
             .where((item) => item.ownerId == a.id)
@@ -1101,6 +1103,7 @@ class ManagerHomePage extends StatelessWidget {
         children: [
           ManagerHeroCard(
             crmTotal: total,
+            managerialTotal: managerialOpportunityTotal,
             managerialOpportunityCount: managerialOpportunityCount,
             crmOpportunityCount: active.length,
             sellerCount: team.length,
@@ -1225,6 +1228,7 @@ class ManagerHomePage extends StatelessWidget {
 class ManagerHeroCard extends StatelessWidget {
   const ManagerHeroCard({
     required this.crmTotal,
+    required this.managerialTotal,
     required this.managerialOpportunityCount,
     required this.crmOpportunityCount,
     required this.sellerCount,
@@ -1234,6 +1238,7 @@ class ManagerHeroCard extends StatelessWidget {
   });
 
   final double crmTotal;
+  final double managerialTotal;
   final int managerialOpportunityCount;
   final int crmOpportunityCount;
   final int sellerCount;
@@ -1300,19 +1305,19 @@ class ManagerHeroCard extends StatelessWidget {
           ),
           const SizedBox(height: 16),
           Text(
-            '$managerialOpportunityCount',
+            _currency(managerialTotal),
             style: const TextStyle(
               color: AppColors.ink,
-              fontSize: 48,
+              fontSize: 36,
               fontWeight: FontWeight.w900,
-              letterSpacing: -1.8,
+              letterSpacing: -1.4,
               height: 1,
             ),
           ),
           const SizedBox(height: 6),
-          const Text(
-            'Cantidad activa en Oportunidades / Gerencia',
-            style: TextStyle(
+          Text(
+            '$managerialOpportunityCount oportunidades gerenciales',
+            style: const TextStyle(
               color: AppColors.muted,
               fontSize: 12.5,
               fontWeight: FontWeight.w700,
@@ -1320,7 +1325,7 @@ class ManagerHeroCard extends StatelessWidget {
           ),
           const SizedBox(height: 14),
           const Text(
-            'TOTAL CRM',
+            'TOTAL CRM DE VENDEDORES',
             style: TextStyle(
               color: AppColors.green,
               fontSize: 10.5,
@@ -1333,7 +1338,7 @@ class ManagerHeroCard extends StatelessWidget {
             _currency(crmTotal),
             style: const TextStyle(
               color: AppColors.ink,
-              fontSize: 22,
+              fontSize: 19,
               fontWeight: FontWeight.w900,
               letterSpacing: -0.6,
             ),
@@ -6063,8 +6068,10 @@ class KonfiApiClient {
         if (managementResponse.statusCode >= 200 &&
             managementResponse.statusCode < 300) {
           final managementPayload = jsonDecode(managementResponse.body);
-          payload['managerialOpportunityCount'] =
-              _visibleManagerialOpportunityCount(managementPayload);
+          final managementSummary =
+              _visibleManagerialOpportunitySummary(managementPayload);
+          payload['managerialOpportunityCount'] = managementSummary.count;
+          payload['managerialOpportunityTotal'] = managementSummary.total;
         }
       } catch (_) {
         // La vista conserva el ultimo conteo si el resumen gerencial no responde.
@@ -6072,12 +6079,18 @@ class KonfiApiClient {
     }
     payload['managerialOpportunityCount'] ??=
         previous?.managerialOpportunityCount;
+    payload['managerialOpportunityTotal'] ??=
+        previous?.managerialOpportunityTotal;
     return SalesStore.fromApi(payload, previous: previous);
   }
 
-  int _visibleManagerialOpportunityCount(Object? value) {
-    if (value is! List) return 0;
-    return value.where((rawItem) {
+  ({int count, double total}) _visibleManagerialOpportunitySummary(
+    Object? value,
+  ) {
+    if (value is! List) return (count: 0, total: 0);
+    var count = 0;
+    var total = 0.0;
+    for (final rawItem in value) {
       final item = _map(rawItem);
       final managements = _list(item['managements']);
       Map<String, dynamic>? latestClosure;
@@ -6092,8 +6105,13 @@ class KonfiApiClient {
           break;
         }
       }
-      return _text(latestClosure?['result']).toLowerCase() != 'perdida';
-    }).length;
+      if (_text(latestClosure?['result']).toLowerCase() == 'perdida') {
+        continue;
+      }
+      count += 1;
+      total += _money(item['amount']);
+    }
+    return (count: count, total: total);
   }
 }
 
@@ -6138,6 +6156,7 @@ class SalesStore {
     required this.agenda,
     required this.forms,
     this.managerialOpportunityCount,
+    this.managerialOpportunityTotal,
     List<GestionRecord>? gestiones,
     Map<String, List<Map<String, String>>>? formResponses,
     List<VisitResult>? visitResults,
@@ -6152,6 +6171,7 @@ class SalesStore {
   final List<AgendaItem> agenda;
   final List<StageForm> forms;
   final int? managerialOpportunityCount;
+  final double? managerialOpportunityTotal;
   final List<GestionRecord> gestiones;
   final Map<String, List<Map<String, String>>> formResponses;
   final List<VisitResult> visitResults;
@@ -6448,6 +6468,9 @@ class SalesStore {
       managerialOpportunityCount: json['managerialOpportunityCount'] == null
           ? previous?.managerialOpportunityCount
           : _int(json['managerialOpportunityCount']),
+      managerialOpportunityTotal: json['managerialOpportunityTotal'] == null
+          ? previous?.managerialOpportunityTotal
+          : _money(json['managerialOpportunityTotal']),
       gestiones: gestiones,
       formResponses: previous == null
           ? {}
@@ -6470,6 +6493,7 @@ class SalesStore {
       agenda: agenda,
       forms: forms,
       managerialOpportunityCount: managerialOpportunityCount,
+      managerialOpportunityTotal: managerialOpportunityTotal,
       gestiones: gestiones,
       formResponses: formResponses,
       visitResults: visitResults,
@@ -6489,6 +6513,7 @@ class SalesStore {
       agenda: agenda,
       forms: forms,
       managerialOpportunityCount: managerialOpportunityCount,
+      managerialOpportunityTotal: managerialOpportunityTotal,
       gestiones: gestiones,
       formResponses: formResponses,
       visitResults: visitResults,
@@ -6505,6 +6530,7 @@ class SalesStore {
       agenda: agenda,
       forms: forms,
       managerialOpportunityCount: managerialOpportunityCount,
+      managerialOpportunityTotal: managerialOpportunityTotal,
       gestiones: gestiones,
       formResponses: formResponses,
       visitResults: visitResults,
@@ -6524,6 +6550,7 @@ class SalesStore {
       agenda: agenda,
       forms: forms,
       managerialOpportunityCount: managerialOpportunityCount,
+      managerialOpportunityTotal: managerialOpportunityTotal,
       gestiones: gestiones,
       formResponses: formResponses,
       visitResults: visitResults,
