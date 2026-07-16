@@ -1086,6 +1086,10 @@ class ManagerHomePage extends StatelessWidget {
         store.managerialOpportunityCount ?? active.length;
     final managerialOpportunityTotal =
         store.managerialOpportunityTotal ?? total;
+    final managementLabel =
+        store.currentSeller.name.toLowerCase().contains('luis valladares')
+            ? 'GERENCIA FINANCIERA'
+            : 'CONTROL EJECUTIVO';
     final rankedTeam = [...team]..sort((a, b) {
         final aTotal = active
             .where((item) => item.ownerId == a.id)
@@ -1102,6 +1106,7 @@ class ManagerHomePage extends StatelessWidget {
         padding: const EdgeInsets.fromLTRB(16, 8, 16, 112),
         children: [
           ManagerHeroCard(
+            managementLabel: managementLabel,
             crmTotal: total,
             managerialTotal: managerialOpportunityTotal,
             managerialOpportunityCount: managerialOpportunityCount,
@@ -1227,6 +1232,7 @@ class ManagerHomePage extends StatelessWidget {
 
 class ManagerHeroCard extends StatelessWidget {
   const ManagerHeroCard({
+    required this.managementLabel,
     required this.crmTotal,
     required this.managerialTotal,
     required this.managerialOpportunityCount,
@@ -1237,6 +1243,7 @@ class ManagerHeroCard extends StatelessWidget {
     super.key,
   });
 
+  final String managementLabel;
   final double crmTotal;
   final double managerialTotal;
   final int managerialOpportunityCount;
@@ -1302,6 +1309,24 @@ class ManagerHeroCard extends StatelessWidget {
                 icon: const Icon(Icons.sync_rounded, size: 21),
               ),
             ],
+          ),
+          const SizedBox(height: 12),
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+            decoration: BoxDecoration(
+              color: AppColors.cyan.withValues(alpha: .1),
+              borderRadius: BorderRadius.circular(999),
+              border: Border.all(color: AppColors.cyan.withValues(alpha: .18)),
+            ),
+            child: Text(
+              managementLabel,
+              style: const TextStyle(
+                color: AppColors.cyan,
+                fontSize: 9.5,
+                fontWeight: FontWeight.w900,
+                letterSpacing: 1,
+              ),
+            ),
           ),
           const SizedBox(height: 14),
           Text(
@@ -1384,17 +1409,38 @@ class ManagerMetricCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return GlassCard(
-      padding: const EdgeInsets.all(14),
+      padding: const EdgeInsets.all(13),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Icon(icon, color: color, size: 22),
+          Container(
+            width: 34,
+            height: 34,
+            decoration: BoxDecoration(
+              color: color.withValues(alpha: .11),
+              borderRadius: BorderRadius.circular(11),
+              border: Border.all(color: color.withValues(alpha: .18)),
+            ),
+            child: Icon(icon, color: color, size: 19),
+          ),
           const Spacer(),
           Text(
             value,
-            style: const TextStyle(fontSize: 24, fontWeight: FontWeight.w900),
+            style: const TextStyle(
+              fontSize: 23,
+              fontWeight: FontWeight.w900,
+              letterSpacing: -.7,
+            ),
           ),
-          Text(label, style: const TextStyle(color: AppColors.muted)),
+          Text(
+            label.toUpperCase(),
+            style: const TextStyle(
+              color: AppColors.muted,
+              fontSize: 9.5,
+              fontWeight: FontWeight.w800,
+              letterSpacing: .5,
+            ),
+          ),
         ],
       ),
     );
@@ -1559,6 +1605,23 @@ class _ManagerTeamPageState extends State<ManagerTeamPage> {
 
   @override
   Widget build(BuildContext context) {
+    final allTeamSellers = widget.store.sellers
+        .where((item) => item.roleId == 'sales_exec')
+        .toList();
+    final sellerIds = allTeamSellers.map((item) => item.id).toSet();
+    final teamOpportunities = widget.store.opportunities
+        .where(
+          (item) =>
+              sellerIds.contains(item.ownerId) && _isActiveOpportunity(item),
+        )
+        .toList();
+    final teamTotal = teamOpportunities.fold<double>(
+      0,
+      (sum, item) => sum + item.amount,
+    );
+    final teamOverdue = teamOpportunities.where(_isOverdueOpportunity).length;
+    final averagePortfolio =
+        allTeamSellers.isEmpty ? 0.0 : teamTotal / allTeamSellers.length;
     final sellers = widget.store.sellers
         .where(
           (item) =>
@@ -1589,6 +1652,18 @@ class _ManagerTeamPageState extends State<ManagerTeamPage> {
           ],
         ),
         const SizedBox(height: 12),
+        ManagerOverviewBanner(
+          icon: Icons.groups_2_outlined,
+          eyebrow: 'EQUIPO COMERCIAL',
+          title: '${allTeamSellers.length} vendedores activos',
+          amount: teamTotal,
+          metrics: [
+            (label: 'Oportunidades', value: '${teamOpportunities.length}'),
+            (label: 'Vencidas', value: '$teamOverdue'),
+            (label: 'Promedio', value: _currency(averagePortfolio)),
+          ],
+        ),
+        const SizedBox(height: 14),
         TextField(
           onChanged: (value) => setState(() => query = value),
           decoration: const InputDecoration(
@@ -1627,6 +1702,146 @@ class _ManagerTeamPageState extends State<ManagerTeamPage> {
         if (sellers.isEmpty)
           const EmptyBlock(text: 'No hay vendedores con este criterio.'),
       ],
+    );
+  }
+}
+
+class ManagerOverviewBanner extends StatelessWidget {
+  const ManagerOverviewBanner({
+    required this.icon,
+    required this.eyebrow,
+    required this.title,
+    required this.amount,
+    required this.metrics,
+    super.key,
+  });
+
+  final IconData icon;
+  final String eyebrow;
+  final String title;
+  final double amount;
+  final List<({String label, String value})> metrics;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        gradient: const LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [Color(0xFF213F52), Color(0xFF17233A)],
+        ),
+        borderRadius: BorderRadius.circular(24),
+        border: Border.all(color: AppColors.green.withValues(alpha: .2)),
+        boxShadow: [
+          BoxShadow(
+            color: AppColors.green.withValues(alpha: .06),
+            blurRadius: 24,
+            offset: const Offset(0, 12),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Container(
+                width: 38,
+                height: 38,
+                decoration: BoxDecoration(
+                  color: AppColors.green.withValues(alpha: .12),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Icon(icon, color: AppColors.green, size: 21),
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      eyebrow,
+                      style: const TextStyle(
+                        color: AppColors.green,
+                        fontSize: 10,
+                        fontWeight: FontWeight.w900,
+                        letterSpacing: 1,
+                      ),
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      title,
+                      style: const TextStyle(fontWeight: FontWeight.w900),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 16),
+          Text(
+            _currency(amount),
+            style: const TextStyle(
+              fontSize: 28,
+              height: 1,
+              fontWeight: FontWeight.w900,
+              letterSpacing: -1,
+            ),
+          ),
+          const SizedBox(height: 14),
+          Row(
+            children: [
+              for (var index = 0; index < metrics.length; index++) ...[
+                if (index > 0) const SizedBox(width: 7),
+                Expanded(
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 9,
+                      vertical: 9,
+                    ),
+                    decoration: BoxDecoration(
+                      color: Colors.white.withValues(alpha: .045),
+                      borderRadius: BorderRadius.circular(13),
+                      border: Border.all(color: AppColors.line),
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        FittedBox(
+                          fit: BoxFit.scaleDown,
+                          alignment: Alignment.centerLeft,
+                          child: Text(
+                            metrics[index].value,
+                            style: const TextStyle(
+                              color: AppColors.ink,
+                              fontSize: 14,
+                              fontWeight: FontWeight.w900,
+                            ),
+                          ),
+                        ),
+                        const SizedBox(height: 2),
+                        Text(
+                          metrics[index].label.toUpperCase(),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: const TextStyle(
+                            color: AppColors.muted,
+                            fontSize: 8,
+                            fontWeight: FontWeight.w800,
+                            letterSpacing: .35,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ],
+            ],
+          ),
+        ],
+      ),
     );
   }
 }
@@ -1779,7 +1994,7 @@ class _ManagerInlineMetric extends StatelessWidget {
   }
 }
 
-class ManagerPipelinePage extends StatelessWidget {
+class ManagerPipelinePage extends StatefulWidget {
   const ManagerPipelinePage({
     required this.store,
     required this.onOpenOpportunity,
@@ -1790,23 +2005,121 @@ class ManagerPipelinePage extends StatelessWidget {
   final ValueChanged<String> onOpenOpportunity;
 
   @override
+  State<ManagerPipelinePage> createState() => _ManagerPipelinePageState();
+}
+
+class _ManagerPipelinePageState extends State<ManagerPipelinePage> {
+  int? selectedStageId;
+
+  @override
   Widget build(BuildContext context) {
-    final active = store.opportunities.where(_isActiveOpportunity).toList();
+    final active =
+        widget.store.opportunities.where(_isActiveOpportunity).toList();
+    final total = active.fold<double>(0, (sum, item) => sum + item.amount);
+    final stages = [...widget.store.stages]
+      ..sort((a, b) => a.id.compareTo(b.id));
+    SalesStage? selectedStage;
+    for (final stage in stages) {
+      if (stage.id == selectedStageId) selectedStage = stage;
+    }
+    final visible = selectedStage == null
+        ? active
+        : active.where((item) => item.stageId == selectedStage!.id).toList();
+    final visibleTotal = visible.fold<double>(
+      0,
+      (sum, item) => sum + item.amount,
+    );
+    final activeStages = stages
+        .where((stage) => active.any((item) => item.stageId == stage.id))
+        .length;
     return ListView(
       padding: const EdgeInsets.fromLTRB(16, 8, 16, 112),
       children: [
         const SectionTitle(
-          eyebrow: 'Pipeline global',
-          title: 'Oportunidades del equipo',
+          eyebrow: 'Control financiero comercial',
+          title: 'Pipeline consolidado',
+        ),
+        const SizedBox(height: 12),
+        ManagerOverviewBanner(
+          icon: Icons.account_balance_wallet_outlined,
+          eyebrow: 'EXPOSICION COMERCIAL',
+          title: 'Cartera activa del equipo',
+          amount: total,
+          metrics: [
+            (label: 'Oportunidades', value: '${active.length}'),
+            (label: 'Etapas activas', value: '$activeStages'),
+            (
+              label: 'Ticket promedio',
+              value: _currency(active.isEmpty ? 0 : total / active.length),
+            ),
+          ],
+        ),
+        const SizedBox(height: 18),
+        const SectionTitle(
+          eyebrow: 'Recorrido comercial',
+          title: 'Explora por etapa',
         ),
         const SizedBox(height: 10),
-        for (final stage in store.stages)
-          StageLane(
-            stage: stage,
-            opportunities:
-                active.where((item) => item.stageId == stage.id).toList(),
-            onOpenOpportunity: onOpenOpportunity,
+        SizedBox(
+          height: 132,
+          child: ListView.separated(
+            scrollDirection: Axis.horizontal,
+            itemCount: stages.length + 1,
+            separatorBuilder: (_, __) => const SizedBox(width: 10),
+            itemBuilder: (context, index) {
+              final stage = index == 0 ? null : stages[index - 1];
+              final stageItems = stage == null
+                  ? active
+                  : active.where((item) => item.stageId == stage.id).toList();
+              final stageTotal = stageItems.fold<double>(
+                0,
+                (sum, item) => sum + item.amount,
+              );
+              return PipelineStageCarouselCard(
+                stageNumber: stage?.id,
+                title: stage?.name ?? 'Todas',
+                count: stageItems.length,
+                amount: stageTotal,
+                selected: selectedStageId == stage?.id,
+                onTap: () => setState(() => selectedStageId = stage?.id),
+              );
+            },
           ),
+        ),
+        const SizedBox(height: 20),
+        Row(
+          children: [
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    selectedStage?.name ?? 'Todas las oportunidades',
+                    style: const TextStyle(
+                      fontSize: 19,
+                      fontWeight: FontWeight.w900,
+                    ),
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    '${visible.length} registros · ${_currency(visibleTotal)}',
+                    style: const TextStyle(color: AppColors.muted),
+                  ),
+                ],
+              ),
+            ),
+            CountPill(value: '${visible.length}'),
+          ],
+        ),
+        const SizedBox(height: 12),
+        if (visible.isEmpty)
+          const EmptyBlock(text: 'No hay oportunidades en esta etapa.')
+        else
+          for (final opportunity in visible)
+            MiniOpportunityTile(
+              opportunity: opportunity,
+              onTap: () => widget.onOpenOpportunity(opportunity.id),
+            ),
       ],
     );
   }
@@ -1959,6 +2272,9 @@ class ManagerProfileSheet extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final executiveArea = user.name.toLowerCase().contains('luis valladares')
+        ? 'Gerencia financiera'
+        : 'Administracion comercial';
     return SheetShell(
       child: Column(
         children: [
@@ -1970,9 +2286,12 @@ class ManagerProfileSheet extends StatelessWidget {
             style: const TextStyle(fontSize: 21, fontWeight: FontWeight.w900),
           ),
           const SizedBox(height: 4),
-          const Text(
-            'Administracion comercial',
-            style: TextStyle(color: AppColors.green),
+          Text(
+            executiveArea,
+            style: const TextStyle(
+              color: AppColors.green,
+              fontWeight: FontWeight.w800,
+            ),
           ),
           const SizedBox(height: 18),
           SizedBox(
