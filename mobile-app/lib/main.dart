@@ -6088,6 +6088,11 @@ class KonfiApiClient {
     Object? value,
   ) {
     if (value is! List) return (count: 0, total: 0);
+    final now = DateTime.now();
+    final periodStart = _isoMonthStart(now.year, now.month);
+    final nextMonth = now.month == 12 ? 1 : now.month + 1;
+    final nextYear = now.month == 12 ? now.year + 1 : now.year;
+    final nextPeriodStart = _isoMonthStart(nextYear, nextMonth);
     var count = 0;
     var total = 0.0;
     for (final rawItem in value) {
@@ -6108,11 +6113,21 @@ class KonfiApiClient {
       if (_text(latestClosure?['result']).toLowerCase() == 'perdida') {
         continue;
       }
+      final closureDate = _text(latestClosure?['date']);
+      final opportunityDate = _text(item['date']);
+      final closedBeforePeriod =
+          closureDate.isNotEmpty && closureDate.compareTo(periodStart) < 0;
+      final scheduledForFuture = opportunityDate.isNotEmpty &&
+          opportunityDate.compareTo(nextPeriodStart) >= 0;
+      if (closedBeforePeriod || scheduledForFuture) continue;
       count += 1;
       total += _money(item['amount']);
     }
     return (count: count, total: total);
   }
+
+  String _isoMonthStart(int year, int month) =>
+      '$year-${month.toString().padLeft(2, '0')}-01';
 }
 
 List<dynamic> _list(Object? value) => value is List ? value : const [];
