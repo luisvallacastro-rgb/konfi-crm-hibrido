@@ -1248,23 +1248,20 @@ class ManagerHeroCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.all(20),
+      padding: const EdgeInsets.fromLTRB(18, 18, 14, 14),
       decoration: BoxDecoration(
-        gradient: LinearGradient(
+        gradient: const LinearGradient(
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
-          colors: [
-            AppColors.green.withValues(alpha: 0.2),
-            AppColors.surface.withValues(alpha: 0.96),
-          ],
+          colors: [Color(0xFF244557), Color(0xFF17233A)],
         ),
-        borderRadius: BorderRadius.circular(28),
-        border: Border.all(color: AppColors.green.withValues(alpha: 0.34)),
-        boxShadow: const [
+        borderRadius: BorderRadius.circular(26),
+        border: Border.all(color: AppColors.green.withValues(alpha: .25)),
+        boxShadow: [
           BoxShadow(
-            color: Color(0x3300D7B1),
-            blurRadius: 34,
-            offset: Offset(0, 16),
+            color: AppColors.green.withValues(alpha: .08),
+            blurRadius: 28,
+            offset: const Offset(0, 14),
           ),
         ],
       ),
@@ -1274,36 +1271,39 @@ class ManagerHeroCard extends StatelessWidget {
           Row(
             children: [
               Container(
-                width: 46,
-                height: 46,
+                width: 36,
+                height: 36,
                 decoration: BoxDecoration(
-                  color: AppColors.green.withValues(alpha: 0.16),
-                  borderRadius: BorderRadius.circular(16),
+                  color: AppColors.green.withValues(alpha: .14),
+                  borderRadius: BorderRadius.circular(12),
                 ),
                 child: const Icon(
                   Icons.insights_rounded,
                   color: AppColors.green,
+                  size: 21,
                 ),
               ),
-              const SizedBox(width: 12),
+              const SizedBox(width: 10),
               const Expanded(
                 child: Text(
                   'OPORTUNIDADES GERENCIALES',
                   style: TextStyle(
                     color: AppColors.green,
+                    fontSize: 11,
                     fontWeight: FontWeight.w900,
-                    letterSpacing: 1,
+                    letterSpacing: 1.1,
                   ),
                 ),
               ),
               IconButton(
                 tooltip: 'Actualizar',
+                visualDensity: VisualDensity.compact,
                 onPressed: () => unawaited(onSync()),
-                icon: const Icon(Icons.sync_rounded),
+                icon: const Icon(Icons.sync_rounded, size: 21),
               ),
             ],
           ),
-          const SizedBox(height: 16),
+          const SizedBox(height: 14),
           Text(
             _currency(managerialTotal),
             style: const TextStyle(
@@ -1314,7 +1314,7 @@ class ManagerHeroCard extends StatelessWidget {
               height: 1,
             ),
           ),
-          const SizedBox(height: 6),
+          const SizedBox(height: 8),
           Text(
             '$managerialOpportunityCount oportunidades gerenciales',
             style: const TextStyle(
@@ -1323,7 +1323,7 @@ class ManagerHeroCard extends StatelessWidget {
               fontWeight: FontWeight.w700,
             ),
           ),
-          const SizedBox(height: 14),
+          const SizedBox(height: 16),
           const Text(
             'TOTAL CRM DE VENDEDORES',
             style: TextStyle(
