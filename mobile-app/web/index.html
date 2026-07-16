@@ -41,6 +41,11 @@
     For more details:
     * https://docs.flutter.dev/platform-integration/web/initialization
   -->
-  <script src="flutter_bootstrap.js" async></script>
+  <script>
+    const bootstrapScript = document.createElement('script');
+    bootstrapScript.src = `flutter_bootstrap.js?v=${Date.now()}`;
+    bootstrapScript.async = true;
+    document.body.appendChild(bootstrapScript);
+  </script>
 </body>
 </html>
